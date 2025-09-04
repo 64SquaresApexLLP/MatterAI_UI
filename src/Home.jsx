@@ -185,7 +185,10 @@ const Home = ({ user, onLogout }) => {
         <div className="flex items-center space-x-4 bg-white/90 backdrop-blur-xl border border-[#062e69]/30 rounded-xl px-4 py-2 shadow-lg">
           <div className="flex items-center space-x-2 text-[#062e69]">
             <User className="w-4 h-4" />
-            <span className="text-sm font-medium">Welcome, {user?.name || 'User'}</span>
+            <span className="text-sm font-medium">
+              Welcome user
+              {/* {user?.name || "User"} */}
+            </span>
           </div>
           <button
             onClick={onLogout}
@@ -287,9 +290,9 @@ const Home = ({ user, onLogout }) => {
             )}
           </div>
         </div>
-        
+
         {isListening && (
-          <div className="flex justify-center mt-2 space-x-1 mb-2">
+          <div className="flex justify-center mt-2 space-x-1 mb-4">
             {[...Array(5)].map((_, i) => (
               <div
                 key={i}
@@ -416,6 +419,10 @@ const Home = ({ user, onLogout }) => {
 
           <button className="group bg-white/90 backdrop-blur-xl border border-[#062e69]/30 hover:border-[#062e69]/50 text-[#062e69] px-6 py-3 rounded-xl font-medium transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-[#062e69]/25">
             Matters
+          </button>
+
+          <button className="group bg-white/90 backdrop-blur-xl border border-[#062e69]/30 hover:border-[#062e69]/50 text-[#062e69] px-6 py-3 rounded-xl font-medium transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-[#062e69]/25">
+            Entries
           </button>
         </div>
 

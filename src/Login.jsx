@@ -9,8 +9,8 @@ const Login = ({ onLoginSuccess }) => {
   const [error, setError] = useState("");
 
   // Default credentials (hidden from frontend)
-  const DEFAULT_USERNAME = "flori@matterhorn.global";
-  const DEFAULT_PASSWORD = "flori@admin25";
+  const DEFAULT_USERNAME = "a@a.com";
+  const DEFAULT_PASSWORD = "a";
 
   const handleSubmit = async (e) => {
     e.preventDefault();
