@@ -10,13 +10,15 @@ import {
   File,
   LogOut,
   User,
+  Languages,
 } from "lucide-react";
 import TimesheetForm from "./TimesheetForm";
 
 const Home = ({ user, onLogout }) => {
   const [query, setQuery] = useState("");
-  const [expandedSection, setExpandedSection] = useState(null);
+  const [selectedButton, setSelectedButton] = useState(null); // Track selected button
   const [selectedLanguage, setSelectedLanguage] = useState("");
+  const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef(null);
@@ -82,18 +84,42 @@ const Home = ({ user, onLogout }) => {
     "Arabic",
   ];
 
-  const handleSectionClick = (section) => {
-    if (section === "Translation") {
-      setExpandedSection(
-        expandedSection === "Translation" ? null : "Translation"
-      );
+  const handleButtonClick = (buttonName) => {
+    if (selectedButton === buttonName) {
+      setSelectedButton(null);
+    } else {
+      setSelectedButton(buttonName);
     }
+
+    // Close timesheet form when selecting other buttons
+    if (buttonName !== "Timesheet" && showTimesheet) {
+      setShowTimesheet(false);
+    }
+
+    // Show timesheet form when Timesheet is selected
+    if (buttonName === "Timesheet") {
+      setShowTimesheet(true);
+    } else {
+      setShowTimesheet(false);
+    }
+
+    // Close language dropdown when other buttons are selected
+    if (buttonName !== "Translation") {
+      setShowLanguageDropdown(false);
+    }
+  };
+
+  const handleLanguageSelect = (language) => {
+    setSelectedLanguage(language);
+    setShowLanguageDropdown(false);
   };
 
   const handleSubmit = () => {
     if (query.trim()) {
       console.log("Query submitted:", query);
       console.log("Files:", uploadedFiles);
+      console.log("Selected Button:", selectedButton);
+      console.log("Selected Language:", selectedLanguage);
       // Handle query submission here
     }
   };
@@ -239,9 +265,55 @@ const Home = ({ user, onLogout }) => {
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Type your Case related search questions here..."
+                placeholder="Case related questions or Translate something here..."
                 className="flex-1 bg-transparent text-[#062e69] placeholder-[#062e69]/50 focus:outline-none text-lg font-medium"
               />
+
+              {/* Language Selection Button - Only show when Translation is selected */}
+              {selectedButton === "Translation" && (
+                <div className="relative flex-shrink-0">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setShowLanguageDropdown(!showLanguageDropdown)
+                    }
+                    className="flex-shrink-0 p-2 text-[#062e69]/70 hover:text-[#062e69] transition-colors duration-200 hover:bg-[#062e69]/10 rounded-lg flex items-center space-x-1"
+                    title="Select Language"
+                  >
+                    <Languages className="w-5 h-5" />
+                    {selectedLanguage && (
+                      <span className="text-sm font-medium max-w-20 truncate">
+                        {selectedLanguage.split("/")[0]}
+                      </span>
+                    )}
+                  </button>
+
+                  {/* Language Dropdown */}
+                  {showLanguageDropdown && (
+                    <div className="absolute bottom-full right-0 mb-2 w-48 bg-white/95 backdrop-blur-xl border border-[#062e69]/30 rounded-xl shadow-xl z-30 max-h-60 overflow-y-auto">
+                      <div className="p-2">
+                        <div className="text-[#062e69] font-medium text-sm mb-2 px-2">
+                          Select Language
+                        </div>
+                        {languages.map((language) => (
+                          <button
+                            key={language}
+                            onClick={() => handleLanguageSelect(language)}
+                            className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-all duration-200 ${
+                              selectedLanguage === language
+                                ? "bg-[#062e69] text-white"
+                                : "text-[#062e69] hover:bg-[#062e69]/10"
+                            }`}
+                          >
+                            {language}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <input
                 type="file"
                 ref={fileInputRef}
@@ -354,81 +426,63 @@ const Home = ({ user, onLogout }) => {
         {/* Action Buttons */}
         <div className="flex flex-wrap justify-center gap-4 animate-slide-up delay-400">
           {/* Translation Button */}
-          <div className="relative">
-            <button
-              onClick={() => handleSectionClick("Translation")}
-              className="group relative bg-white/90 backdrop-blur-xl border border-[#062e69]/30 hover:border-[#062e69]/50 text-[#062e69] px-6 py-3 rounded-xl font-medium transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-[#062e69]/25 flex items-center space-x-2"
-            >
-              <span>Translation</span>
-              {expandedSection === "Translation" ? (
-                <ChevronUp className="w-4 h-4 transition-transform duration-200" />
-              ) : (
-                <ChevronDown className="w-4 h-4 transition-transform duration-200" />
-              )}
-            </button>
-
-            {/* Expanded Translation Options */}
-            {expandedSection === "Translation" && (
-              <div className="absolute top-full left-0 mt-4 w-80 bg-white/95 backdrop-blur-xl border border-[#062e69]/30 rounded-2xl p-6 shadow-2xl animate-slide-down z-20">
-                <div className="space-y-6">
-                  {/* Target Language Selection */}
-                  <div>
-                    <h3 className="text-[#062e69] font-medium mb-3 flex items-center space-x-2">
-                      <span>Target Language Selection</span>
-                    </h3>
-                    <div className="grid grid-cols-2 gap-2">
-                      {languages.map((language) => (
-                        <button
-                          key={language}
-                          onClick={() => setSelectedLanguage(language)}
-                          className={`text-sm px-3 py-2 rounded-lg transition-all duration-200 ${
-                            selectedLanguage === language
-                              ? "bg-[#062e69] text-white shadow-md"
-                              : "bg-[#062e69]/10 text-[#062e69] hover:bg-[#062e69]/20"
-                          }`}
-                        >
-                          {language}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Other Options */}
-                  <div className="flex space-x-3">
-                    <button className="flex-1 bg-[#062e69]/10 hover:bg-[#062e69]/20 text-[#062e69] px-4 py-2 rounded-lg transition-all duration-200 text-sm font-medium">
-                      Jurisdiction
-                    </button>
-                    <button className="flex-1 bg-[#062e69]/10 hover:bg-[#062e69]/20 text-[#062e69] px-4 py-2 rounded-lg transition-all duration-200 text-sm font-medium">
-                      Client Specific Model
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Other Main Buttons */}
           <button
-            onClick={() => setShowTimesheet(true)}
-            className="group bg-white/90 backdrop-blur-xl border border-[#062e69]/30 
-             hover:border-[#062e69]/50 text-[#062e69] px-6 py-3 rounded-xl font-medium 
-             transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-[#062e69]/25"
+            onClick={() => handleButtonClick("Translation")}
+            className={`group relative backdrop-blur-xl border font-medium transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-[#062e69]/25 px-6 py-3 rounded-xl ${
+              selectedButton === "Translation"
+                ? "bg-blue-900 text-white border-[#062e69] shadow-lg"
+                : "bg-white/90 border-[#062e69]/30 hover:border-[#062e69]/50 text-[#062e69]"
+            }`}
+          >
+            Translation
+          </button>
+
+          {/* Timesheet Button */}
+          <button
+            onClick={() => handleButtonClick("Timesheet")}
+            className={`group backdrop-blur-xl border font-medium transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-[#062e69]/25 px-6 py-3 rounded-xl ${
+              selectedButton === "Timesheet"
+                ? "bg-blue-900 text-white border-[#062e69] shadow-lg"
+                : "bg-white/90 border-[#062e69]/30 hover:border-[#062e69]/50 text-[#062e69]"
+            }`}
           >
             Timesheet
           </button>
 
-          <button className="group bg-white/90 backdrop-blur-xl border border-[#062e69]/30 hover:border-[#062e69]/50 text-[#062e69] px-6 py-3 rounded-xl font-medium transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-[#062e69]/25">
+          {/* Matters Button */}
+          <button
+            onClick={() => handleButtonClick("Matters")}
+            className={`group backdrop-blur-xl border font-medium transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-[#062e69]/25 px-6 py-3 rounded-xl ${
+              selectedButton === "Matters"
+                ? "bg-blue-900 text-white border-[#062e69] shadow-lg"
+                : "bg-white/90 border-[#062e69]/30 hover:border-[#062e69]/50 text-[#062e69]"
+            }`}
+          >
             Matters
           </button>
 
-          <button className="group bg-white/90 backdrop-blur-xl border border-[#062e69]/30 hover:border-[#062e69]/50 text-[#062e69] px-6 py-3 rounded-xl font-medium transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-[#062e69]/25">
+          {/* Entries Button */}
+          <button
+            onClick={() => handleButtonClick("Entries")}
+            className={`group backdrop-blur-xl border font-medium transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-[#062e69]/25 px-6 py-3 rounded-xl ${
+              selectedButton === "Entries"
+                ? "bg-blue-900 text-white border-[#062e69] shadow-lg"
+                : "bg-white/90 border-[#062e69]/30 hover:border-[#062e69]/50 text-[#062e69]"
+            }`}
+          >
             Entries
           </button>
         </div>
 
+        {/* Timesheet Form */}
         {showTimesheet && (
           <div className="mt-8 animate-fade-in">
-            <TimesheetForm onClose={() => setShowTimesheet(false)} />
+            <TimesheetForm
+              onClose={() => {
+                setShowTimesheet(false);
+                setSelectedButton(null);
+              }}
+            />
           </div>
         )}
       </div>
