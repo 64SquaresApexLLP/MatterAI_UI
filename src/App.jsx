@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import Login from "./Login";
-import Home from "./Home";
+import SelectChatbot from "./SelectChatbot";
 
 const App = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -19,7 +19,7 @@ const App = () => {
   return (
     <div className="App">
       {isAuthenticated ? (
-        <Home user={user} onLogout={handleLogout} />
+        <SelectChatbot user={user} onLogout={handleLogout} />
       ) : (
         <Login onLoginSuccess={handleLoginSuccess} />
       )}
