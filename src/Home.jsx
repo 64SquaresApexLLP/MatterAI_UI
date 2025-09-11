@@ -13,6 +13,8 @@ import {
   Languages,
 } from "lucide-react";
 import TimesheetForm from "./TimesheetForm";
+import TimesheetEntries from "./TimesheetEntries";
+import { queryAPI, authAPI } from "./api/apiService.js";
 
 const Home = ({ user, onLogout }) => {
   const [query, setQuery] = useState("");
@@ -23,7 +25,7 @@ const Home = ({ user, onLogout }) => {
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef(null);
   const [showTimesheet, setShowTimesheet] = useState(false);
-
+  const [showEntries, setShowEntries] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef(null);
 
@@ -96,11 +98,25 @@ const Home = ({ user, onLogout }) => {
       setShowTimesheet(false);
     }
 
+    // Close entries view when selecting other buttons
+    if (buttonName !== "Entries" && showEntries) {
+      setShowEntries(false);
+    }
+
     // Show timesheet form when Timesheet is selected
     if (buttonName === "Timesheet") {
       setShowTimesheet(true);
+      setShowEntries(false);
     } else {
       setShowTimesheet(false);
+    }
+
+    // Show entries view when Entries is selected
+    if (buttonName === "Entries") {
+      setShowEntries(true);
+      setShowTimesheet(false);
+    } else if (buttonName !== "Entries") {
+      setShowEntries(false);
     }
 
     // Close language dropdown when other buttons are selected
@@ -114,17 +130,35 @@ const Home = ({ user, onLogout }) => {
     setShowLanguageDropdown(false);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (query.trim()) {
-      console.log("Query submitted:", query);
-      console.log("Files:", uploadedFiles);
-      console.log("Selected Button:", selectedButton);
-      console.log("Selected Language:", selectedLanguage);
-      // Handle query submission here
+      try {
+        const queryData = {
+          query: query.trim(),
+          selected_button: selectedButton,
+          selected_language: selectedLanguage,
+          uploaded_files: uploadedFiles,
+        };
+
+        console.log("Submitting query:", queryData);
+        const response = await queryAPI.search(queryData);
+
+        if (response.success) {
+          console.log("Query response:", response);
+          // Handle successful response - you can show results in UI
+          alert(`Query processed successfully! ${response.message}`);
+        } else {
+          console.error("Query failed:", response.message);
+          alert(`Query failed: ${response.message}`);
+        }
+      } catch (error) {
+        console.error("Query error:", error);
+        alert(`Query error: ${error.message}`);
+      }
     }
   };
 
-  const handleFileUpload = (files) => {
+  const handleFileUpload = async (files) => {
     const fileArray = Array.from(files);
     const validFiles = fileArray.filter((file) => {
       const validTypes = [
@@ -141,15 +175,32 @@ const Home = ({ user, onLogout }) => {
       );
     });
 
-    const newFiles = validFiles.map((file) => ({
-      id: Date.now() + Math.random(),
-      file,
-      name: file.name,
-      size: file.size,
-      type: file.type,
-    }));
+    // Upload files to backend
+    try {
+      const uploadPromises = validFiles.map((file) =>
+        queryAPI.uploadFile(file)
+      );
+      const uploadResults = await Promise.all(uploadPromises);
 
-    setUploadedFiles((prev) => [...prev, ...newFiles]);
+      const successfulUploads = uploadResults
+        .filter((result) => result.success)
+        .map((result) => result.file);
+
+      setUploadedFiles((prev) => [...prev, ...successfulUploads]);
+
+      if (successfulUploads.length > 0) {
+        console.log(`Successfully uploaded ${successfulUploads.length} files`);
+      }
+
+      const failedUploads = uploadResults.filter((result) => !result.success);
+      if (failedUploads.length > 0) {
+        console.error("Some files failed to upload:", failedUploads);
+        alert(`${failedUploads.length} files failed to upload`);
+      }
+    } catch (error) {
+      console.error("File upload error:", error);
+      alert(`File upload failed: ${error.message}`);
+    }
   };
 
   const handleFileInputChange = (e) => {
@@ -480,6 +531,18 @@ const Home = ({ user, onLogout }) => {
             <TimesheetForm
               onClose={() => {
                 setShowTimesheet(false);
+                setSelectedButton(null);
+              }}
+            />
+          </div>
+        )}
+
+        {/* Timesheet Entries */}
+        {showEntries && (
+          <div className="mt-8 animate-fade-in">
+            <TimesheetEntries
+              onClose={() => {
+                setShowEntries(false);
                 setSelectedButton(null);
               }}
             />

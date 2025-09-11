@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { CheckCircle, X } from "lucide-react";
+import { timesheetAPI } from "./api/apiService.js";
 
 const TimesheetForm = ({ onClose }) => {
   const [step, setStep] = useState(0);
@@ -94,12 +95,53 @@ const TimesheetForm = ({ onClose }) => {
   const nextStep = () => setStep((prev) => Math.min(prev + 1, maxSteps - 1));
   const prevStep = () => setStep((prev) => Math.max(prev - 1, 0));
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault(); // Prevent form submission
-    console.log("Final Submitted Data:", formData);
-    onClose(); // Close form after successful submission
-  };
 
+    try {
+      // Transform formData to match API expectations
+      const apiData = {
+        client: formData.client,
+        matter: formData.matter,
+        timekeeper: formData.timekeeper,
+        date: formData.date, // Using alias instead of entry_date
+        type: formData.type, // Using alias instead of entry_type
+        hours_worked: formData.hoursWorked
+          ? parseFloat(formData.hoursWorked)
+          : null,
+        hours_billed: formData.hoursBilled
+          ? parseFloat(formData.hoursBilled)
+          : null,
+        quantity: formData.quantity ? parseFloat(formData.quantity) : null,
+        rate: formData.rate ? parseFloat(formData.rate) : 0,
+        currency: formData.currency,
+        total: formData.total ? parseFloat(formData.total) : 0,
+        phase_task: formData.phaseTask,
+        activity: formData.activity,
+        expense: formData.expense,
+        bill_code: formData.billCode,
+        status: formData.status, // Using alias instead of entry_status
+        narrative: formData.narrative,
+      };
+
+      console.log("Submitting timesheet data:", apiData);
+      const response = await timesheetAPI.createEntry(apiData);
+
+      if (response.success) {
+        console.log("Timesheet entry created:", response);
+        alert(
+          `Timesheet entry created successfully! Entry ID: ${response.entry_id}`
+        );
+        onClose(); // Close form after successful submission
+      } else {
+        console.error("Timesheet submission failed:", response.message);
+        alert(`Timesheet submission failed: ${response.message}`);
+      }
+    } catch (error) {
+      console.error("Timesheet submission error:", error);
+      alert(`Timesheet submission error: ${error.message}`);
+    }
+  };
 
   const renderStepContent = () => {
     if (formData.type === "Fee") {
@@ -113,7 +155,9 @@ const TimesheetForm = ({ onClose }) => {
               exit={{ x: -100, opacity: 0 }}
               transition={{ duration: 0.4 }}
             >
-              <label className="block mb-2 text-[#062e69] font-medium">Client</label>
+              <label className="block mb-2 text-[#062e69] font-medium">
+                Client
+              </label>
               <select
                 name="client"
                 value={formData.client}
@@ -125,7 +169,9 @@ const TimesheetForm = ({ onClose }) => {
                 ))}
               </select>
 
-              <label className="block mt-4 mb-2 text-[#062e69] font-medium">Matter</label>
+              <label className="block mt-4 mb-2 text-[#062e69] font-medium">
+                Matter
+              </label>
               <select
                 name="matter"
                 value={formData.matter}
@@ -137,7 +183,9 @@ const TimesheetForm = ({ onClose }) => {
                 ))}
               </select>
 
-              <label className="block mt-4 mb-2 text-[#062e69] font-medium">Timekeeper</label>
+              <label className="block mt-4 mb-2 text-[#062e69] font-medium">
+                Timekeeper
+              </label>
               <select
                 name="timekeeper"
                 value={formData.timekeeper}
@@ -149,7 +197,9 @@ const TimesheetForm = ({ onClose }) => {
                 ))}
               </select>
 
-              <label className="block mt-4 mb-2 text-[#062e69] font-medium">Date</label>
+              <label className="block mt-4 mb-2 text-[#062e69] font-medium">
+                Date
+              </label>
               <input
                 type="date"
                 name="date"
@@ -158,7 +208,9 @@ const TimesheetForm = ({ onClose }) => {
                 className="w-full p-3 rounded-lg bg-white border border-[#062e69]/20 text-[#062e69] focus:outline-none focus:border-[#062e69] focus:ring-2 focus:ring-[#062e69]/20"
               />
 
-              <label className="block mt-4 mb-2 text-[#062e69] font-medium">Type</label>
+              <label className="block mt-4 mb-2 text-[#062e69] font-medium">
+                Type
+              </label>
               <select
                 name="type"
                 value={formData.type}
@@ -182,7 +234,9 @@ const TimesheetForm = ({ onClose }) => {
             >
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block mb-2 text-[#062e69] font-medium">Hours Worked</label>
+                  <label className="block mb-2 text-[#062e69] font-medium">
+                    Hours Worked
+                  </label>
                   <input
                     name="hoursWorked"
                     value={formData.hoursWorked}
@@ -191,7 +245,9 @@ const TimesheetForm = ({ onClose }) => {
                   />
                 </div>
                 <div>
-                  <label className="block mb-2 text-[#062e69] font-medium">Hours Billed</label>
+                  <label className="block mb-2 text-[#062e69] font-medium">
+                    Hours Billed
+                  </label>
                   <input
                     name="hoursBilled"
                     value={formData.hoursBilled}
@@ -201,7 +257,9 @@ const TimesheetForm = ({ onClose }) => {
                 </div>
               </div>
 
-              <label className="block mt-4 mb-2 text-[#062e69] font-medium">Phase Task</label>
+              <label className="block mt-4 mb-2 text-[#062e69] font-medium">
+                Phase Task
+              </label>
               <select
                 name="phaseTask"
                 value={formData.phaseTask}
@@ -213,7 +271,9 @@ const TimesheetForm = ({ onClose }) => {
                 ))}
               </select>
 
-              <label className="block mt-4 mb-2 text-[#062e69] font-medium">Activity</label>
+              <label className="block mt-4 mb-2 text-[#062e69] font-medium">
+                Activity
+              </label>
               <select
                 name="activity"
                 value={formData.activity}
@@ -236,7 +296,9 @@ const TimesheetForm = ({ onClose }) => {
               exit={{ x: -100, opacity: 0 }}
               transition={{ duration: 0.4 }}
             >
-              <label className="block mb-2 text-[#062e69] font-medium">Bill Code</label>
+              <label className="block mb-2 text-[#062e69] font-medium">
+                Bill Code
+              </label>
               <select
                 name="billCode"
                 value={formData.billCode}
@@ -248,7 +310,9 @@ const TimesheetForm = ({ onClose }) => {
                 ))}
               </select>
 
-              <label className="block mt-4 mb-2 text-[#062e69] font-medium">Status</label>
+              <label className="block mt-4 mb-2 text-[#062e69] font-medium">
+                Status
+              </label>
               <select
                 name="status"
                 value={formData.status}
@@ -271,7 +335,9 @@ const TimesheetForm = ({ onClose }) => {
               exit={{ x: -100, opacity: 0 }}
               transition={{ duration: 0.4 }}
             >
-              <label className="block mb-2 text-[#062e69] font-medium">Narrative</label>
+              <label className="block mb-2 text-[#062e69] font-medium">
+                Narrative
+              </label>
               <textarea
                 name="narrative"
                 value={formData.narrative}
@@ -305,8 +371,12 @@ const TimesheetForm = ({ onClose }) => {
                   <span className="text-[#062e69]/80">{formData.matter}</span>
                 </p>
                 <p>
-                  <span className="font-medium text-[#062e69]">Timekeeper: </span>
-                  <span className="text-[#062e69]/80">{formData.timekeeper}</span>
+                  <span className="font-medium text-[#062e69]">
+                    Timekeeper:{" "}
+                  </span>
+                  <span className="text-[#062e69]/80">
+                    {formData.timekeeper}
+                  </span>
                 </p>
                 <p>
                   <span className="font-medium text-[#062e69]">Date: </span>
@@ -317,23 +387,37 @@ const TimesheetForm = ({ onClose }) => {
                   <span className="text-[#062e69]/80">{formData.type}</span>
                 </p>
                 <p>
-                  <span className="font-medium text-[#062e69]">Hours Worked: </span>
-                  <span className="text-[#062e69]/80">{formData.hoursWorked}</span>
+                  <span className="font-medium text-[#062e69]">
+                    Hours Worked:{" "}
+                  </span>
+                  <span className="text-[#062e69]/80">
+                    {formData.hoursWorked}
+                  </span>
                 </p>
                 <p>
-                  <span className="font-medium text-[#062e69]">Hours Billed: </span>
-                  <span className="text-[#062e69]/80">{formData.hoursBilled}</span>
+                  <span className="font-medium text-[#062e69]">
+                    Hours Billed:{" "}
+                  </span>
+                  <span className="text-[#062e69]/80">
+                    {formData.hoursBilled}
+                  </span>
                 </p>
                 <p>
-                  <span className="font-medium text-[#062e69]">Phase Task: </span>
-                  <span className="text-[#062e69]/80">{formData.phaseTask}</span>
+                  <span className="font-medium text-[#062e69]">
+                    Phase Task:{" "}
+                  </span>
+                  <span className="text-[#062e69]/80">
+                    {formData.phaseTask}
+                  </span>
                 </p>
                 <p>
                   <span className="font-medium text-[#062e69]">Activity: </span>
                   <span className="text-[#062e69]/80">{formData.activity}</span>
                 </p>
                 <p>
-                  <span className="font-medium text-[#062e69]">Bill Code: </span>
+                  <span className="font-medium text-[#062e69]">
+                    Bill Code:{" "}
+                  </span>
                   <span className="text-[#062e69]/80">{formData.billCode}</span>
                 </p>
                 <p>
@@ -341,8 +425,12 @@ const TimesheetForm = ({ onClose }) => {
                   <span className="text-[#062e69]/80">{formData.status}</span>
                 </p>
                 <p>
-                  <span className="font-medium text-[#062e69]">Narrative: </span>
-                  <span className="text-[#062e69]/80">{formData.narrative}</span>
+                  <span className="font-medium text-[#062e69]">
+                    Narrative:{" "}
+                  </span>
+                  <span className="text-[#062e69]/80">
+                    {formData.narrative}
+                  </span>
                 </p>
               </div>
             </motion.div>
@@ -363,7 +451,9 @@ const TimesheetForm = ({ onClose }) => {
               exit={{ x: -100, opacity: 0 }}
               transition={{ duration: 0.4 }}
             >
-              <label className="block mb-2 text-[#062e69] font-medium">Client</label>
+              <label className="block mb-2 text-[#062e69] font-medium">
+                Client
+              </label>
               <select
                 name="client"
                 value={formData.client}
@@ -375,7 +465,9 @@ const TimesheetForm = ({ onClose }) => {
                 ))}
               </select>
 
-              <label className="block mt-4 mb-2 text-[#062e69] font-medium">Matter</label>
+              <label className="block mt-4 mb-2 text-[#062e69] font-medium">
+                Matter
+              </label>
               <select
                 name="matter"
                 value={formData.matter}
@@ -387,7 +479,9 @@ const TimesheetForm = ({ onClose }) => {
                 ))}
               </select>
 
-              <label className="block mt-4 mb-2 text-[#062e69] font-medium">Timekeeper</label>
+              <label className="block mt-4 mb-2 text-[#062e69] font-medium">
+                Timekeeper
+              </label>
               <select
                 name="timekeeper"
                 value={formData.timekeeper}
@@ -399,7 +493,9 @@ const TimesheetForm = ({ onClose }) => {
                 ))}
               </select>
 
-              <label className="block mt-4 mb-2 text-[#062e69] font-medium">Date</label>
+              <label className="block mt-4 mb-2 text-[#062e69] font-medium">
+                Date
+              </label>
               <input
                 type="date"
                 name="date"
@@ -408,7 +504,9 @@ const TimesheetForm = ({ onClose }) => {
                 className="w-full p-3 rounded-lg bg-white border border-[#062e69]/20 text-[#062e69] focus:outline-none focus:border-[#062e69] focus:ring-2 focus:ring-[#062e69]/20"
               />
 
-              <label className="block mt-4 mb-2 text-[#062e69] font-medium">Type</label>
+              <label className="block mt-4 mb-2 text-[#062e69] font-medium">
+                Type
+              </label>
               <select
                 name="type"
                 value={formData.type}
@@ -432,7 +530,9 @@ const TimesheetForm = ({ onClose }) => {
             >
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block mb-2 text-[#062e69] font-medium">Quantity</label>
+                  <label className="block mb-2 text-[#062e69] font-medium">
+                    Quantity
+                  </label>
                   <input
                     name="quantity"
                     value={formData.quantity}
@@ -441,7 +541,9 @@ const TimesheetForm = ({ onClose }) => {
                   />
                 </div>
                 <div>
-                  <label className="block mb-2 text-[#062e69] font-medium">Rate</label>
+                  <label className="block mb-2 text-[#062e69] font-medium">
+                    Rate
+                  </label>
                   <input
                     name="rate"
                     value={formData.rate}
@@ -451,19 +553,23 @@ const TimesheetForm = ({ onClose }) => {
                 </div>
               </div>
 
-              <label className="block mt-4 mb-2 text-[#062e69] font-medium">Currency</label>
+              <label className="block mt-4 mb-2 text-[#062e69] font-medium">
+                Currency
+              </label>
               <select
                 name="currency"
                 value={formData.currency}
                 onChange={handleChange}
                 className="w-full p-3 rounded-lg bg-white border border-[#062e69]/20 text-[#062e69] focus:outline-none focus:border-[#062e69] focus:ring-2 focus:ring-[#062e69]/20"
               >
-                <option>US dollars</option>
-                <option>EUR</option>
-                <option>GBP</option>
+                <option value="USD">USD</option>
+                <option value="EUR">EUR</option>
+                <option value="GBP">GBP</option>
               </select>
 
-              <label className="block mt-4 mb-2 text-[#062e69] font-medium">Total</label>
+              <label className="block mt-4 mb-2 text-[#062e69] font-medium">
+                Total
+              </label>
               <input
                 name="total"
                 value={formData.total}
@@ -482,7 +588,9 @@ const TimesheetForm = ({ onClose }) => {
               exit={{ x: -100, opacity: 0 }}
               transition={{ duration: 0.4 }}
             >
-              <label className="block mb-2 text-[#062e69] font-medium">Phase Task</label>
+              <label className="block mb-2 text-[#062e69] font-medium">
+                Phase Task
+              </label>
               <select
                 name="phaseTask"
                 value={formData.phaseTask}
@@ -494,7 +602,9 @@ const TimesheetForm = ({ onClose }) => {
                 ))}
               </select>
 
-              <label className="block mt-4 mb-2 text-[#062e69] font-medium">Expense</label>
+              <label className="block mt-4 mb-2 text-[#062e69] font-medium">
+                Expense
+              </label>
               <select
                 name="expense"
                 value={formData.expense}
@@ -517,7 +627,9 @@ const TimesheetForm = ({ onClose }) => {
               exit={{ x: -100, opacity: 0 }}
               transition={{ duration: 0.4 }}
             >
-              <label className="block mb-2 text-[#062e69] font-medium">Bill Code</label>
+              <label className="block mb-2 text-[#062e69] font-medium">
+                Bill Code
+              </label>
               <select
                 name="billCode"
                 value={formData.billCode}
@@ -529,7 +641,9 @@ const TimesheetForm = ({ onClose }) => {
                 ))}
               </select>
 
-              <label className="block mt-4 mb-2 text-[#062e69] font-medium">Status</label>
+              <label className="block mt-4 mb-2 text-[#062e69] font-medium">
+                Status
+              </label>
               <select
                 name="status"
                 value={formData.status}
@@ -552,7 +666,9 @@ const TimesheetForm = ({ onClose }) => {
               exit={{ x: -100, opacity: 0 }}
               transition={{ duration: 0.4 }}
             >
-              <label className="block mb-2 text-[#062e69] font-medium">Narrative</label>
+              <label className="block mb-2 text-[#062e69] font-medium">
+                Narrative
+              </label>
               <textarea
                 name="narrative"
                 value={formData.narrative}
@@ -586,8 +702,12 @@ const TimesheetForm = ({ onClose }) => {
                   <span className="text-[#062e69]/80">{formData.matter}</span>
                 </p>
                 <p>
-                  <span className="font-medium text-[#062e69]">Timekeeper: </span>
-                  <span className="text-[#062e69]/80">{formData.timekeeper}</span>
+                  <span className="font-medium text-[#062e69]">
+                    Timekeeper:{" "}
+                  </span>
+                  <span className="text-[#062e69]/80">
+                    {formData.timekeeper}
+                  </span>
                 </p>
                 <p>
                   <span className="font-medium text-[#062e69]">Date: </span>
@@ -614,15 +734,21 @@ const TimesheetForm = ({ onClose }) => {
                   <span className="text-[#062e69]/80">{formData.total}</span>
                 </p>
                 <p>
-                  <span className="font-medium text-[#062e69]">Phase Task: </span>
-                  <span className="text-[#062e69]/80">{formData.phaseTask}</span>
+                  <span className="font-medium text-[#062e69]">
+                    Phase Task:{" "}
+                  </span>
+                  <span className="text-[#062e69]/80">
+                    {formData.phaseTask}
+                  </span>
                 </p>
                 <p>
                   <span className="font-medium text-[#062e69]">Expense: </span>
                   <span className="text-[#062e69]/80">{formData.expense}</span>
                 </p>
                 <p>
-                  <span className="font-medium text-[#062e69]">Bill Code: </span>
+                  <span className="font-medium text-[#062e69]">
+                    Bill Code:{" "}
+                  </span>
                   <span className="text-[#062e69]/80">{formData.billCode}</span>
                 </p>
                 <p>
@@ -630,8 +756,12 @@ const TimesheetForm = ({ onClose }) => {
                   <span className="text-[#062e69]/80">{formData.status}</span>
                 </p>
                 <p>
-                  <span className="font-medium text-[#062e69]">Narrative: </span>
-                  <span className="text-[#062e69]/80">{formData.narrative}</span>
+                  <span className="font-medium text-[#062e69]">
+                    Narrative:{" "}
+                  </span>
+                  <span className="text-[#062e69]/80">
+                    {formData.narrative}
+                  </span>
                 </p>
               </div>
             </motion.div>
@@ -658,9 +788,13 @@ const TimesheetForm = ({ onClose }) => {
             >
               {index < step ? <CheckCircle size={16} /> : index + 1}
             </div>
-            <p className={`text-xs mt-2 truncate transition-colors duration-300 ${
-              index <= step ? "text-[#062e69] font-medium" : "text-[#062e69]/60"
-            }`}>
+            <p
+              className={`text-xs mt-2 truncate transition-colors duration-300 ${
+                index <= step
+                  ? "text-[#062e69] font-medium"
+                  : "text-[#062e69]/60"
+              }`}
+            >
               {label}
             </p>
           </div>

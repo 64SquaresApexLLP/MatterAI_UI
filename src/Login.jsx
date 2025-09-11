@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Eye, EyeOff, User, Lock, LogIn, Shield, X } from "lucide-react";
+import { authAPI } from "./api/apiService.js";
 
 const Login = ({ onLoginSuccess }) => {
   const [username, setUsername] = useState("");
@@ -17,19 +18,23 @@ const Login = ({ onLoginSuccess }) => {
     setIsLoading(true);
     setError("");
 
-    // Simulate authentication delay
-    setTimeout(() => {
-      if (username === DEFAULT_USERNAME && password === DEFAULT_PASSWORD) {
-        onLoginSuccess({
-          username: username,
-          email: username,
-          name: "Flori"
-        });
+    try {
+      const response = await authAPI.login(username, password);
+
+      if (response.success) {
+        onLoginSuccess(response.user);
       } else {
-        setError("Invalid credentials. Please check your username and password.");
+        setError(response.message || "Login failed. Please try again.");
       }
+    } catch (error) {
+      console.error("Login error:", error);
+      setError(
+        error.message ||
+          "Login failed. Please check your connection and try again."
+      );
+    } finally {
       setIsLoading(false);
-    }, 1200);
+    }
   };
 
   return (
@@ -49,13 +54,17 @@ const Login = ({ onLoginSuccess }) => {
           <div
             key={i}
             className={`absolute w-1 h-1 rounded-full animate-pulse ${
-              i % 3 === 0 ? 'bg-[#062e69]/30' : i % 3 === 1 ? 'bg-blue-400/20' : 'bg-white/10'
+              i % 3 === 0
+                ? "bg-[#062e69]/30"
+                : i % 3 === 1
+                ? "bg-blue-400/20"
+                : "bg-white/10"
             }`}
             style={{
               left: `${Math.random() * 100}%`,
               top: `${Math.random() * 100}%`,
               animationDelay: `${Math.random() * 5}s`,
-              animationDuration: `${2 + Math.random() * 3}s`
+              animationDuration: `${2 + Math.random() * 3}s`,
             }}
           />
         ))}
@@ -63,9 +72,18 @@ const Login = ({ onLoginSuccess }) => {
 
       {/* Geometric shapes */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-20 left-20 w-2 h-2 bg-[#062e69]/20 rotate-45 animate-spin" style={{animationDuration: '20s'}}></div>
-        <div className="absolute bottom-32 right-32 w-3 h-3 bg-blue-400/15 rotate-45 animate-spin" style={{animationDuration: '15s'}}></div>
-        <div className="absolute top-1/3 right-20 w-1 h-1 bg-white/20 rotate-45 animate-spin" style={{animationDuration: '25s'}}></div>
+        <div
+          className="absolute top-20 left-20 w-2 h-2 bg-[#062e69]/20 rotate-45 animate-spin"
+          style={{ animationDuration: "20s" }}
+        ></div>
+        <div
+          className="absolute bottom-32 right-32 w-3 h-3 bg-blue-400/15 rotate-45 animate-spin"
+          style={{ animationDuration: "15s" }}
+        ></div>
+        <div
+          className="absolute top-1/3 right-20 w-1 h-1 bg-white/20 rotate-45 animate-spin"
+          style={{ animationDuration: "25s" }}
+        ></div>
       </div>
 
       <div className="relative z-10 w-full max-w-lg">
@@ -75,10 +93,10 @@ const Login = ({ onLoginSuccess }) => {
             <div className="relative group">
               {/* Enhanced glow effect with custom color */}
               <div className="absolute inset-0 bg-gradient-to-r from-[#062e69]/30 via-blue-500/20 to-[#062e69]/30 rounded-full blur-3xl scale-110 group-hover:scale-130 transition-transform duration-700 animate-pulse"></div>
-              <img 
-                src="./logo.png" 
-                alt="Matterhorn Logo" 
-                className="relative w-80 h-auto drop-shadow-2xl transform group-hover:scale-110 transition-transform duration-500 filter brightness-110" 
+              <img
+                src="./logo.png"
+                alt="Matterhorn Logo"
+                className="relative w-80 h-auto drop-shadow-2xl transform group-hover:scale-110 transition-transform duration-500 filter brightness-110"
               />
             </div>
           </div>
@@ -94,11 +112,13 @@ const Login = ({ onLoginSuccess }) => {
         <div className="relative group">
           {/* Enhanced glow effect with custom color */}
           <div className="absolute inset-0 bg-gradient-to-r from-[#062e69]/25 via-blue-500/15 to-[#062e69]/25 rounded-2xl blur-xl group-hover:blur-2xl transition-all duration-700 animate-pulse"></div>
-          
+
           <div className="relative bg-white/95 backdrop-blur-md border border-[#062e69]/30 rounded-2xl p-8 shadow-xl shadow-[#062e69]/10">
             {/* Form Header */}
             <div className="text-center mb-6">
-              <h2 className="text-xl font-bold text-[#062e69] mb-2">Login to Continue</h2>
+              <h2 className="text-xl font-bold text-[#062e69] mb-2">
+                Login to Continue
+              </h2>
               <div className="w-12 h-0.5 bg-gradient-to-r from-[#062e69] to-blue-400 mx-auto rounded-full"></div>
             </div>
 
@@ -111,9 +131,11 @@ const Login = ({ onLoginSuccess }) => {
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <User className={`h-4 w-4 transition-colors duration-300 ${
-                      username ? 'text-[#062e69]' : 'text-[#062e69]/60'
-                    }`} />
+                    <User
+                      className={`h-4 w-4 transition-colors duration-300 ${
+                        username ? "text-[#062e69]" : "text-[#062e69]/60"
+                      }`}
+                    />
                   </div>
                   <input
                     type="email"
@@ -139,9 +161,11 @@ const Login = ({ onLoginSuccess }) => {
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Lock className={`h-4 w-4 transition-colors duration-300 ${
-                      password ? 'text-[#062e69]' : 'text-[#062e69]/60'
-                    }`} />
+                    <Lock
+                      className={`h-4 w-4 transition-colors duration-300 ${
+                        password ? "text-[#062e69]" : "text-[#062e69]/60"
+                      }`}
+                    />
                   </div>
                   <input
                     type={showPassword ? "text" : "password"}
@@ -183,8 +207,8 @@ const Login = ({ onLoginSuccess }) => {
                 disabled={isLoading}
                 className={`w-full py-3 rounded-lg font-bold text-sm transition-all duration-300 transform hover:scale-[1.01] flex items-center justify-center space-x-2 relative overflow-hidden ${
                   isLoading
-                    ? 'bg-[#062e69]/70 cursor-not-allowed'
-                    : 'bg-[#062e69] hover:bg-[#062e69]/90 hover:shadow-lg hover:shadow-[#062e69]/25'
+                    ? "bg-[#062e69]/70 cursor-not-allowed"
+                    : "bg-[#062e69] hover:bg-[#062e69]/90 hover:shadow-lg hover:shadow-[#062e69]/25"
                 } text-white disabled:transform-none`}
               >
                 {isLoading ? (
