@@ -16,7 +16,7 @@ import TimesheetForm from "./TimesheetForm";
 import TimesheetEntries from "./TimesheetEntries";
 import { queryAPI, authAPI } from "./api/apiService.js";
 
-const Home = ({ user, onLogout }) => {
+const Home = ({ user, onBack, onLogout }) => {
   const [query, setQuery] = useState("");
   const [selectedButton, setSelectedButton] = useState(null); // Track selected button
   const [selectedLanguage, setSelectedLanguage] = useState("");
@@ -75,15 +75,8 @@ const Home = ({ user, onLogout }) => {
 
   const languages = [
     "Chinese/Mandarin",
-    "French",
     "German",
-    "Spanish",
-    "Italian",
-    "Portuguese",
-    "Japanese",
-    "Korean",
-    "Russian",
-    "Arabic",
+    "French",
   ];
 
   const handleButtonClick = (buttonName) => {
@@ -258,6 +251,12 @@ const Home = ({ user, onLogout }) => {
       </div>
 
       {/* Header with user info and logout */}
+      <div className="absolute top-4 left-4 z-20">
+        <button className="flex items-center space-x-4 rounded-xl px-4 py-2 text-white" onClick={onBack}>
+        ← Back to Chatbot Selection
+        </button>
+      </div>
+
       <div className="absolute top-4 right-4 z-20">
         <div className="flex items-center space-x-4 bg-white/90 backdrop-blur-xl border border-[#062e69]/30 rounded-xl px-4 py-2 shadow-lg">
           <div className="flex items-center space-x-2 text-[#062e69]">

@@ -3,13 +3,12 @@ import { Eye, EyeOff, User, Lock, LogIn, Shield, X } from "lucide-react";
 import { authAPI } from "./api/apiService.js";
 
 const Login = ({ onLoginSuccess }) => {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
+  const [username, setUsername] = useState("a@a.com");
+  const [password, setPassword] = useState("a");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // Default credentials (hidden from frontend)
   const DEFAULT_USERNAME = "a@a.com";
   const DEFAULT_PASSWORD = "a";
 
@@ -101,20 +100,15 @@ const Login = ({ onLoginSuccess }) => {
             </div>
           </div>
           <h1 className="text-3xl font-light text-white mb-4 bg-gradient-to-r from-white via-blue-100 to-[#062e69] bg-clip-text text-transparent">
-            Welcome to Matterhorn
+            AI Assistants<br />Ontologics / Matterhorn
           </h1>
-          <p className="text-slate-300 text-lg font-light mb-2">
-            AI Legal Assistant Platform
-          </p>
         </div>
 
         {/* Login Form */}
         <div className="relative group">
-          {/* Enhanced glow effect with custom color */}
           <div className="absolute inset-0 bg-gradient-to-r from-[#062e69]/25 via-blue-500/15 to-[#062e69]/25 rounded-2xl blur-xl group-hover:blur-2xl transition-all duration-700 animate-pulse"></div>
 
           <div className="relative bg-white/95 backdrop-blur-md border border-[#062e69]/30 rounded-2xl p-8 shadow-xl shadow-[#062e69]/10">
-            {/* Form Header */}
             <div className="text-center mb-6">
               <h2 className="text-xl font-bold text-[#062e69] mb-2">
                 Login to Continue
@@ -123,7 +117,6 @@ const Login = ({ onLoginSuccess }) => {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-5">
-              {/* Username Field */}
               <div className="space-y-2">
                 <label className="text-[#062e69] text-xs font-bold block tracking-wider uppercase flex items-center space-x-1">
                   <User className="w-3 h-3" />
@@ -153,7 +146,6 @@ const Login = ({ onLoginSuccess }) => {
                 </div>
               </div>
 
-              {/* Password Field */}
               <div className="space-y-2">
                 <label className="text-[#062e69] text-xs font-bold block tracking-wider uppercase flex items-center space-x-1">
                   <Lock className="w-3 h-3" />
@@ -189,7 +181,6 @@ const Login = ({ onLoginSuccess }) => {
                 </div>
               </div>
 
-              {/* Error Message */}
               {error && (
                 <div className="bg-red-50 border border-red-200 rounded-lg p-3">
                   <div className="flex items-center space-x-2">
@@ -201,7 +192,6 @@ const Login = ({ onLoginSuccess }) => {
                 </div>
               )}
 
-              {/* Login Button */}
               <button
                 type="submit"
                 disabled={isLoading}
@@ -224,7 +214,6 @@ const Login = ({ onLoginSuccess }) => {
                 )}
               </button>
 
-              {/* Additional Security Info */}
               <div className="text-center pt-3 border-t border-[#062e69]/10">
                 <p className="text-[#062e69]/60 text-xs font-medium flex items-center justify-center space-x-1">
                   <Shield className="w-2.5 h-2.5" />
