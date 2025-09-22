@@ -116,7 +116,7 @@ const SelectChatbot = ({ user, onLogout }) => {
                                     Specialized AI legal assistant designed for back office operations and legal document processing.
                                 </p>
 
-                                <div className="bg-blue-700 text-white px-6 py-3 rounded-full font-semibold group-hover:bg-blue-600 transition-colors duration-300 inline-block border-2 border-blue-600">
+                                <div className="bg-blue-700 text-white px-6 py-3 rounded-full font-semibold group-hover:bg-blue-600 transition-colors duration-300 inline-block">
                                     Access Platform
                                 </div>
                             </div>

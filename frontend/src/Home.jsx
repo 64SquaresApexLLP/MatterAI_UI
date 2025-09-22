@@ -66,6 +66,28 @@ const translationAPI = {
     return data
   },
 
+    translateText: async (text, targetLanguage) => {
+    const backendLanguage = LANGUAGE_MAPPING[targetLanguage] || targetLanguage.toLowerCase();
+    
+    const response = await fetch(`${TRANSLATION_API_BASE_URL}/translate_text`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        text: text,
+        target_language: backendLanguage
+      }),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+      throw new Error(errorData.detail || `HTTP ${response.status}: ${response.statusText}`);
+    }
+    
+    return await response.json();
+  },
+
   download: async (file) => {
     // console.log("FILEEEEEE: ", file)
     const response = await fetch(`${TRANSLATION_API_BASE_URL}/download/${file}`, {
@@ -107,6 +129,7 @@ const Home = ({ user, onBack, onLogout }) => {
   const fileInputRef = useRef(null);
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef(null);
+  const [textTranslationResult, setTextTranslationResult] = useState(null);
 
   useEffect(() => {
     // Generate a random number between 60 and 80
@@ -167,21 +190,22 @@ const Home = ({ user, onBack, onLogout }) => {
     "English"
   ];
 
-  const handleButtonClick = (buttonName) => {
-    if (selectedButton === buttonName) {
-      setSelectedButton(null);
-    } else {
-      setSelectedButton(buttonName);
-    }
-
-    // Reset translation state when switching away from Translation
-    if (buttonName !== "Translation") {
-      setTranslationResult(null);
-      setPreviewText("");
-      setShowPreview(false);
-      setShowLanguageDropdown(false);
-    }
-  };
+const handleButtonClick = (buttonName) => {
+  if (selectedButton === buttonName) {
+    setSelectedButton(null);
+  } else {
+    setSelectedButton(buttonName);
+  }
+  
+  // Reset translation state when switching away from Translation
+  if (buttonName !== "Translation") {
+    setTranslationResult(null);
+    setTextTranslationResult(null); // Add this line
+    setPreviewText("");
+    setShowPreview(false);
+    setShowLanguageDropdown(false);
+  }
+};
 
   const handleLanguageSelect = (language) => {
     setSelectedLanguage(language);
@@ -237,14 +261,60 @@ const Home = ({ user, onBack, onLogout }) => {
     }
   };
 
-  const handleSubmit = async () => {
-    if (selectedButton === "Translation") {
+  const handleTranslateText = async () => {
+  if (!selectedLanguage) {
+    toast.error("Please select a target language");
+    return;
+  }
+  
+  if (!query.trim()) {
+    toast.error("Please enter text to translate");
+    return;
+  }
+  
+  setIsTranslating(true);
+  const translatingToast = toast.loading("Translating your text...");
+  
+  try {
+    const result = await translationAPI.translateText(query, selectedLanguage);
+    
+    toast.update(translatingToast, {
+      render: "Text translation completed successfully!",
+      type: "success",
+      isLoading: false,
+      autoClose: 3000,
+    });
+    
+    setTextTranslationResult(result);
+  } catch (error) {
+    console.error("Text translation error:", error);
+    toast.update(translatingToast, {
+      render: `Translation failed: ${error.message}`,
+      type: "error",
+      isLoading: false,
+      autoClose: 5000,
+    });
+  } finally {
+    setIsTranslating(false);
+  }
+};
+
+const handleSubmit = async () => {
+  if (selectedButton === "Translation") {
+    if (uploadedFiles.length > 0) {
+      // Handle file translation
       await handleTranslateFiles();
     } else if (query.trim()) {
-      // Handle other query types here
-      toast.info("Query functionality not implemented yet");
+      // Handle text translation
+      await handleTranslateText();
+    } else {
+      toast.error("Please enter text to translate or upload a file");
     }
-  };
+  } else if (query.trim()) {
+    // Handle other query types here
+    toast.info("Query functionality not implemented yet");
+  }
+};
 
   const handleFileUpload = (files) => {
     const fileArray = Array.from(files);
@@ -720,6 +790,57 @@ const Home = ({ user, onBack, onLogout }) => {
             </button>
           </div>
         </div>
+      {/* Text Translation Result */}
+      <center>
+
+{textTranslationResult && (
+  <div className="mt-8 animate-slide-up delay-500 w-[50vw]">
+    <div className="bg-white/90 backdrop-blur-xl border border-[#062e69]/30 rounded-2xl p-6 shadow-lg">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center space-x-2">
+          <CheckCircle className="w-5 h-5 text-green-500" />
+          <h3 className="text-lg font-semibold text-[#062e69]">
+            Translation Complete
+          </h3>
+        </div>
+        <button
+          onClick={() => setTextTranslationResult(null)}
+          className="p-1 text-[#062e69]/60 hover:text-[#062e69] transition-colors rounded-lg hover:bg-[#062e69]/10"
+          >
+          <X className="w-5 h-5" />
+        </button>
+      </div>
+      
+      <div className="space-y-4">
+        <div>
+          <label className="text-sm font-medium text-[#062e69]/70 mb-2 block">
+            Original Text:
+          </label>
+          <p className="text-[#062e69] bg-[#062e69]/5 rounded-lg p-3 border border-[#062e69]/10">
+            {query}
+          </p>
+        </div>
+        
+        <div>
+          <label className="text-sm font-medium text-[#062e69]/70 mb-2 block">
+            Translated Text ({selectedLanguage}):
+          </label>
+          <p className="text-[#062e69] bg-green-50 rounded-lg p-3 border border-green-200 font-medium">
+            {textTranslationResult.translated_text}
+          </p>
+        </div>
+        
+        {textTranslationResult.message && (
+          <div className="text-sm text-green-600 flex items-center space-x-2">
+            <CheckCircle className="w-4 h-4" />
+            <span>{textTranslationResult.message}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  </div>
+)}
+</center>
       </div>
 
       {/* Preview Panel */}
