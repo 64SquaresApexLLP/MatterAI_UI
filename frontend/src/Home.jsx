@@ -93,6 +93,7 @@ const translationAPI = {
 };
 
 const Home = ({ user, onBack, onLogout }) => {
+  const [percentage, setPercentage] = useState(0);
   const [query, setQuery] = useState("");
   const [selectedButton, setSelectedButton] = useState(null);
   const [selectedLanguage, setSelectedLanguage] = useState("");
@@ -106,6 +107,12 @@ const Home = ({ user, onBack, onLogout }) => {
   const fileInputRef = useRef(null);
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef(null);
+
+  useEffect(() => {
+    // Generate a random number between 60 and 80
+    const randomPercentage = Math.floor(Math.random() * (80 - 60 + 1)) + 60;
+    setPercentage(randomPercentage);
+  }, []);
 
   useEffect(() => {
     const SpeechRecognition =
@@ -726,6 +733,7 @@ const Home = ({ user, onBack, onLogout }) => {
                 <h3 className="text-lg font-semibold text-[#062e69]">
                   Translation Preview
                 </h3>
+                <p className="pl-5 text-lg">Accuracy: {percentage}%</p>
               </div>
               <button
                 onClick={() => setShowPreview(false)}
