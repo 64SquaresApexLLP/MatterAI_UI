@@ -2,11 +2,13 @@ import React, { useState } from "react";
 import {  LogOut,
   User,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 import Home from "./Home";
 import OntologicsChat from "./OntologicsChat";
 
 const SelectChatbot = ({ user, onLogout }) => {
+    const navigate = useNavigate();
     const [selectedBot, setSelectedBot] = useState(null);
 
     const handleBotSelect = (botType) => {
@@ -77,7 +79,9 @@ const SelectChatbot = ({ user, onLogout }) => {
                                     Advanced AI assistant powered for patents and knowledge management.
                                 </p>
 
-                                <div className="bg-orange-400 text-blue-900 px-6 py-3 rounded-full font-semibold group-hover:bg-orange-300 transition-colors duration-300 inline-block">
+                                <div 
+                                onClick={() => window.open("https://ontoai.vercel.app", "")}
+                                className="bg-orange-400 text-blue-900 px-6 py-3 rounded-full font-semibold group-hover:bg-orange-300 transition-colors duration-300 inline-block">
                                     Start Chat
                                 </div>
                             </div>
