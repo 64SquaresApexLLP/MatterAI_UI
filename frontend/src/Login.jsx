@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import { Eye, EyeOff, User, Lock, LogIn, Shield, X } from "lucide-react";
-import { authAPI } from "./api/apiService.js";
 
 const Login = ({ onLoginSuccess }) => {
   const [username, setUsername] = useState("a@a.com");
@@ -17,23 +16,15 @@ const Login = ({ onLoginSuccess }) => {
     setIsLoading(true);
     setError("");
 
-    try {
-      const response = await authAPI.login(username, password);
-
-      if (response.success) {
-        onLoginSuccess(response.user);
+    // For this example, just simulate a delay and "successful login" logic
+    setTimeout(() => {
+      if (username === DEFAULT_USERNAME && password === DEFAULT_PASSWORD) {
+        onLoginSuccess({ username }); // Simulating a successful login
       } else {
-        setError(response.message || "Login failed. Please try again.");
+        setError("Invalid username or password.");
       }
-    } catch (error) {
-      console.error("Login error:", error);
-      setError(
-        error.message ||
-          "Login failed. Please check your connection and try again."
-      );
-    } finally {
       setIsLoading(false);
-    }
+    }, 1500);
   };
 
   return (
@@ -170,7 +161,8 @@ const Login = ({ onLoginSuccess }) => {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-[#062e69]/60 hover:text-[#062e69] transition-colors duration-300"
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-[#062e
+                    text-[#062e69]/60 hover:text-[#062e69] transition-colors duration-300"
                   >
                     {showPassword ? (
                       <EyeOff className="h-4 w-4" />
