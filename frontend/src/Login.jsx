@@ -1,24 +1,23 @@
 import React, { useState } from "react";
 import { Eye, EyeOff, User, Lock, LogIn, Shield, X } from "lucide-react";
+import { authAPI } from "./api/apiService";
 
 const Login = ({ onLoginSuccess }) => {
-  const [username, setUsername] = useState("a@a.com");
-  const [password, setPassword] = useState("a");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
-
-  const DEFAULT_USERNAME = "a@a.com";
-  const DEFAULT_PASSWORD = "a";
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
     setError("");
+    const responce = await authAPI.login(username, password);
 
     // For this example, just simulate a delay and "successful login" logic
     setTimeout(() => {
-      if (username === DEFAULT_USERNAME && password === DEFAULT_PASSWORD) {
+      if (responce.success == true) {
         onLoginSuccess({ username }); // Simulating a successful login
       } else {
         setError("Invalid username or password.");
@@ -91,7 +90,9 @@ const Login = ({ onLoginSuccess }) => {
             </div>
           </div>
           <h1 className="text-3xl font-light text-white mb-4 bg-gradient-to-r from-white via-blue-100 to-[#062e69] bg-clip-text text-transparent">
-            AI Assistants<br />Ontologics / Matterhorn
+            AI Assistants
+            <br />
+            Ontologics / Matterhorn
           </h1>
         </div>
 

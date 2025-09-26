@@ -84,7 +84,6 @@ export const authAPI = {
     if (response.success && response.token) {
       setAuthToken(response.token);
     }
-
     return response;
   },
 
