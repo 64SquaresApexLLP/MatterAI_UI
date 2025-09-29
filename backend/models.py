@@ -29,8 +29,15 @@ class QueryType(str, Enum):
 
 # Authentication Models
 class LoginRequest(BaseModel):
-    username: EmailStr = Field(..., description="User email address")
+    username: Optional[str] = None
+    email: Optional[str] = None
     password: str = Field(..., min_length=1, description="User password")
+
+    @model_validator(mode='after')
+    def validate_username_or_email(self):
+        if not self.username and not self.email:
+            raise ValueError('Either username or email must be provided')
+        return self
 
 class LoginResponse(BaseModel):
     success: bool
@@ -100,15 +107,17 @@ class TimesheetEntry(BaseModel):
     def validate_entry_fields(self):
         """Validate fields based on entry type"""
         if self.entry_type == TimesheetType.FEE:
-            if self.hours_worked is None or self.hours_billed is None:
-                raise ValueError('Hours worked and hours billed are required for Fee entries')
-            if self.activity is None:
+            if self.hours_worked is None:
+                raise ValueError('Hours worked is required for Fee entries')
+            if self.hours_billed is None:
+                raise ValueError('Hours billed is required for Fee entries')
+            if not self.activity or self.activity.strip() == "":
                 raise ValueError('Activity is required for Fee entries')
 
         elif self.entry_type == TimesheetType.COST:
             if self.quantity is None:
                 raise ValueError('Quantity is required for Cost entries')
-            if self.expense is None:
+            if not self.expense or self.expense.strip() == "":
                 raise ValueError('Expense type is required for Cost entries')
 
         return self

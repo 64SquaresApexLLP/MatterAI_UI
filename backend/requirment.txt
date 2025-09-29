@@ -8,3 +8,4 @@ passlib[bcrypt]>=1.7.4
 python-dotenv>=1.0.0
 uvicorn
 jose
+bcrypt<4.0

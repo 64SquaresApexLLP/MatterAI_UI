@@ -3,8 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import os
 
-# Import all route modules
-from auth_routes import router as auth_router
+# Import route modules
+from auth_routes import router as auth_router, init_users_table
 from query_routes import router as query_router
 from timesheet_routes import router as timesheet_router
 from file_routes import router as file_router
@@ -22,23 +22,26 @@ app = FastAPI(
 # Configure CORS for frontend integration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000","http://localhost:5173/timesheet/entries"],  # React dev servers
+    allow_origins=[
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "http://localhost:5173/timesheet/entries"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
 
 # Mount static files for file downloads
 if not os.path.exists("uploads"):
     os.makedirs("uploads")
 app.mount("/static", StaticFiles(directory="uploads"), name="static")
 
-app.include_router(auth_router)      
-app.include_router(query_router)     # Query and search routes
-app.include_router(timesheet_router) # Timesheet management routes
-app.include_router(file_router)      # File management routes
+# Include routers
+app.include_router(auth_router)
+app.include_router(query_router)
+app.include_router(timesheet_router)
+app.include_router(file_router)
 
 # Root endpoint
 @app.get("/")
@@ -64,7 +67,8 @@ async def startup_event():
     print("🚀 Starting MatterAI Backend...")
     try:
         if initialize_database():
-            pass  # Success message already shown
+            print("✅ Database initialized")
+            init_users_table()  # <-- moved inside startup after DB init
         else:
             print("📝 Continuing with mock data...")
     except Exception as e:
@@ -84,8 +88,6 @@ async def health_check():
             "database": "healthy"
         }
     }
-
-
 
 if __name__ == "__main__":
     import uvicorn

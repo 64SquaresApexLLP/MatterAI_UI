@@ -1,5 +1,6 @@
-from fastapi import APIRouter, HTTPException, Depends, status, Query
+from fastapi import APIRouter, HTTPException, Depends, status, Query, Request
 from typing import List, Optional
+from pydantic import ValidationError
 import uuid
 from datetime import datetime, date
 
@@ -24,13 +25,42 @@ def generate_entry_id() -> str:
 
 @router.post("/entries", response_model=TimesheetResponse)
 async def create_timesheet_entry_endpoint(
-    entry: TimesheetEntry,
+    request: Request,
     current_user: User = Depends(get_current_user)
 ):
     """
     Create a new timesheet entry
     """
     try:
+        # Get raw request body
+        body = await request.json()
+        print(f"📝 Raw request body: {body}")
+
+        # Fix currency mapping
+        currency_mapping = {
+            'US dollars': 'USD',
+            'US Dollars': 'USD',
+            'USD': 'USD',
+            'Euro': 'EUR',
+            'EUR': 'EUR',
+            'British Pound': 'GBP',
+            'GBP': 'GBP'
+        }
+
+        if 'currency' in body:
+            original_currency = body['currency']
+            body['currency'] = currency_mapping.get(original_currency, original_currency)
+            if original_currency != body['currency']:
+                print(f"🔄 Mapped currency: '{original_currency}' -> '{body['currency']}'")
+
+        # Validate and create TimesheetEntry
+        try:
+            entry = TimesheetEntry(**body)
+            print(f"📝 Creating timesheet entry for user: {current_user.username}")
+            print(f"📝 Validated entry data: {entry.model_dump()}")
+        except ValidationError as e:
+            print(f"❌ Validation error: {e}")
+            raise HTTPException(status_code=422, detail=f"Validation error: {str(e)}")
         # Generate unique ID
         entry_id = generate_entry_id()
 
