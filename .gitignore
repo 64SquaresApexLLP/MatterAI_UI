@@ -92,3 +92,5 @@ coverage.xml
 *.bak
 *.backup
 *.old
+
+backend/myenv/

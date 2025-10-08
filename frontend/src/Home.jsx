@@ -25,16 +25,22 @@ import TimesheetEntries from "./TimesheetEntries";
 import { queryAPI, authAPI } from "./api/apiService.js";
 
 // Translation API Service
-const TRANSLATION_API_BASE_URL = import.meta.env.REACT_APP_TRANSLATION_API_URL || "http://13.203.104.235:8000";
+const TRANSLATION_API_BASE_URL = import.meta.env.VITE_TRANSLATION_API_URL;
 
 // Language mapping to match backend expectations
 const LANGUAGE_MAPPING = {
-  "Chinese (Mandarin)": "chinese (mandarin)",
+  "Chinese (Mandarin)": "simplified chinese",
+  "Japanese": "japanese",
   "German": "german",
   "French": "french", 
   "Spanish": "spanish",
   "Italian": "italian",
-  "English": "english"
+  "English": "english",
+  "Korean": "korean",
+  "Swedish": "swedish",
+  "Danish": "danish",
+  "Finnish": "finnish",
+  "Dutch": "dutch"
 };
 
 const translationAPI = {
@@ -191,7 +197,13 @@ const Home = ({ user, onBack, onLogout }) => {
     "French",
     "Spanish",
     "Italian",
-    "English"
+    "Swedish",
+    "Danish",
+    "Dutch",
+    "Finnish",
+    "Korean",
+    "Japanese",
+    "English",
   ];
 
   const handleButtonClick = (buttonName) => {
