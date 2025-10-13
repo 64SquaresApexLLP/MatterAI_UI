@@ -129,6 +129,12 @@ const Home = ({ user, onBack, onLogout }) => {
   const [previewingFile, setPreviewingFile] = useState(null);
   const docxPreviewRef = useRef(null);
 
+  const [showFileSelector, setShowFileSelector] = useState(false);
+
+  useEffect(() => {
+  setShowFileSelector(translationJobs.length > 0);
+}, [translationJobs]);
+
   // Handle preview file loading when a job is selected for preview
   useEffect(() => {
     const loadPreviewFile = async () => {
@@ -754,7 +760,10 @@ const Home = ({ user, onBack, onLogout }) => {
                 <h3 className="text-lg font-semibold text-[#062e69]">
                   Translation Preview
                 </h3>
-                <p className="pl-5 text-lg">Accuracy: {percentage}%</p>
+
+                {showFileSelector && translationJobs.length > 1 && (
+                  <p className="pl-5 text-lg">Accuracy: {percentage}%</p>
+                )}
               </div>
               <button
                 onClick={handleClosePreview}
@@ -765,27 +774,27 @@ const Home = ({ user, onBack, onLogout }) => {
             </div>
 
             {/* File Selection */}
-            {translationJobs.length > 1 && (
-              <div className="p-4 border-b border-[#062e69]/10">
-                <label className="text-sm font-medium text-[#062e69]/70 mb-2 block">
-                  Select file to preview:
-                </label>
-                <select
-                  value={selectedJobForPreview || ''}
-                  onChange={(e) => setSelectedJobForPreview(e.target.value)}
-                  className="w-full p-2 border border-[#062e69]/30 rounded-lg bg-white text-[#062e69] focus:outline-none focus:border-[#062e69]/50"
-                >
-                  <option value="">Choose a file...</option>
-                  {translationJobs
-                    .filter(job => jobStatuses[job.job_id]?.status === 'COMPLETED')
-                    .map(job => (
-                      <option key={job.job_id} value={job.job_id}>
-                        {job.filename}
-                      </option>
-                    ))}
-                </select>
-              </div>
-            )}
+            {translationJobs.length > 0 && (
+  <div className="p-4 border-b border-[#062e69]/10">
+    <label className="text-sm font-medium text-[#062e69]/70 mb-2 block">
+      Select file to preview:
+    </label>
+    <select
+      value={selectedJobForPreview || ''}
+      onChange={(e) => setSelectedJobForPreview(e.target.value)}
+      className="w-full p-2 border border-[#062e69]/30 rounded-lg bg-white text-[#062e69] focus:outline-none focus:border-[#062e69]/50"
+    >
+      <option value="">Choose a file...</option>
+      {translationJobs
+        .filter(job => jobStatuses[job.job_id]?.status === 'COMPLETED')
+        .map(job => (
+          <option key={job.job_id} value={job.job_id}>
+            {job.filename}
+          </option>
+        ))}
+    </select>
+  </div>
+)}
 
             {/* Preview Content */}
             <div className="flex-1 p-4 overflow-y-auto">

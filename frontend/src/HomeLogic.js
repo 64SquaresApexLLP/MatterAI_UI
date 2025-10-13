@@ -220,7 +220,7 @@ export const useHomeLogic = () => {
   const [previewUrl, setPreviewUrl] = useState(null);
 
   useEffect(() => {
-    const randomPercentage = Math.floor(Math.random() * (80 - 60 + 1)) + 60;
+    const randomPercentage = Math.floor(Math.random() * (90 - 80 + 1)) + 80;
     setPercentage(randomPercentage);
 
     if (notificationHelper.isSupported()) {
@@ -417,11 +417,11 @@ export const useHomeLogic = () => {
     return;
   }
 
-  if (!selectedLanguage) {
-    const message = "Please select a target language";
-    toast ? toast.error(message) : alert(message);
-    return;
-  }
+  // if (!selectedLanguage) {
+  //   const message = "Please select a target language";
+  //   toast ? toast.error(message) : alert(message);
+  //   return;
+  // }
 
   if (uploadedFiles.length === 0) {
     const message = "Please upload files to translate";
