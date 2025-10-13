@@ -15,7 +15,10 @@ import {
   CheckCircle,
   Upload,
   Bell,
-  BellOff
+  BellOff,
+  Clock,
+  AlertCircle,
+  DownloadCloud
 } from "lucide-react";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -32,8 +35,7 @@ import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 import { renderAsync } from 'docx-preview';
 
-// pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
-pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.6.347/pdf.worker.entry.min.js'
+pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
 const getFileIcon = (fileName, fileType) => {
   if (fileType === "application/pdf" || fileName.endsWith(".pdf")) {
@@ -51,6 +53,32 @@ const getFileIcon = (fileName, fileType) => {
   return <File className="w-4 h-4 text-gray-400" />;
 };
 
+const getStatusIcon = (status) => {
+  switch (status) {
+    case 'COMPLETED':
+      return <CheckCircle className="w-4 h-4 text-green-500" />;
+    case 'PROCESSING':
+      return <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />;
+    case 'FAILED':
+      return <AlertCircle className="w-4 h-4 text-red-500" />;
+    default:
+      return <Clock className="w-4 h-4 text-yellow-500" />;
+  }
+};
+
+const getStatusColor = (status) => {
+  switch (status) {
+    case 'COMPLETED':
+      return 'text-green-600 bg-green-50 border-green-200';
+    case 'PROCESSING':
+      return 'text-blue-600 bg-blue-50 border-blue-200';
+    case 'FAILED':
+      return 'text-red-600 bg-red-50 border-red-200';
+    default:
+      return 'text-yellow-600 bg-yellow-50 border-yellow-200';
+  }
+};
+
 const Home = ({ user, onBack, onLogout }) => {
   const {
     percentage,
@@ -65,6 +93,8 @@ const Home = ({ user, onBack, onLogout }) => {
     isDragOver,
     isTranslating,
     translationResult,
+    translationJobs,
+    jobStatuses,
     previewText,
     showPreview,
     setShowPreview,
@@ -89,54 +119,111 @@ const Home = ({ user, onBack, onLogout }) => {
     handleDragLeave,
     handleDrop,
     removeFile,
-    handleDownload
+    handleDownload,
+    handleDownloadAll
   } = useHomeLogic();
 
   const [numPages, setNumPages] = useState(null);
   const [pageNumber, setPageNumber] = useState(1);
+  const [selectedJobForPreview, setSelectedJobForPreview] = useState(null);
+  const [previewingFile, setPreviewingFile] = useState(null);
   const docxPreviewRef = useRef(null);
 
+  // Handle preview file loading when a job is selected for preview
   useEffect(() => {
-  if (previewFile && previewFileType === 'docx' && docxPreviewRef.current) {
-    // Clear previous content
-    docxPreviewRef.current.innerHTML = '';
+    const loadPreviewFile = async () => {
+      if (selectedJobForPreview && jobStatuses[selectedJobForPreview]?.status === 'COMPLETED') {
+        const jobStatus = jobStatuses[selectedJobForPreview];
+        if (jobStatus.download_id) {
+          try {
+            const response = await fetch(`${import.meta.env.VITE_TRANSLATION_API_URL}/download/${jobStatus.download_id}`, {
+              method: 'GET',
+            });
+
+            if (response.ok) {
+              const blob = await response.blob();
+              const contentType = response.headers.get('content-type');
+              
+              let fileType = null;
+              if (contentType) {
+                if (contentType.includes('application/pdf')) {
+                  fileType = 'pdf';
+                } else if (contentType.includes('application/vnd.openxmlformats-officedocument.wordprocessingml.document')) {
+                  fileType = 'docx';
+                }
+              }
+
+              if (fileType === 'pdf') {
+                const blobUrl = URL.createObjectURL(blob);
+                setPreviewingFile({ file: blobUrl, type: fileType, jobId: selectedJobForPreview });
+              } else {
+                setPreviewingFile({ file: blob, type: fileType, jobId: selectedJobForPreview });
+              }
+            }
+          } catch (error) {
+            console.error('Error loading preview file:', error);
+            setPreviewingFile(null);
+          }
+        }
+      }
+    };
+
+    loadPreviewFile();
+  }, [selectedJobForPreview, jobStatuses]);
+
+  useEffect(() => {
+    if (previewingFile?.file && previewingFile.type === 'docx' && docxPreviewRef.current) {
+      // Clear previous content
+      docxPreviewRef.current.innerHTML = '';
+      
+      // Render DOCX preview
+      renderAsync(previewingFile.file, docxPreviewRef.current, undefined, {
+        className: 'docx-wrapper',
+        inWrapper: true,
+        ignoreWidth: false,
+        ignoreHeight: false,
+        ignoreFonts: false,
+        breakPages: true,
+        ignoreLastRenderedPageBreak: true,
+        experimental: false,
+        trimXmlDeclaration: true,
+        useBase64URL: false,
+        renderChanges: false,
+        renderHeaders: true,
+        renderFooters: true,
+        renderFootnotes: true,
+        renderEndnotes: true,
+      }).catch(error => {
+        console.error('Error rendering DOCX:', error);
+        docxPreviewRef.current.innerHTML = '<p class="text-red-500 p-4">Error loading document preview</p>';
+      });
+    }
+  }, [previewingFile]);
+
+  const handleClosePreview = () => {
+    setShowPreview(false);
+    setPageNumber(1);
+    setSelectedJobForPreview(null);
     
-    // Render DOCX preview
-    renderAsync(previewFile, docxPreviewRef.current, undefined, {
-      className: 'docx-wrapper',
-      inWrapper: true,
-      ignoreWidth: false,
-      ignoreHeight: false,
-      ignoreFonts: false,
-      breakPages: true,
-      ignoreLastRenderedPageBreak: true,
-      experimental: false,
-      trimXmlDeclaration: true,
-      useBase64URL: false,
-      renderChanges: false,
-      renderHeaders: true,
-      renderFooters: true,
-      renderFootnotes: true,
-      renderEndnotes: true,
-    }).catch(error => {
-      console.error('Error rendering DOCX:', error);
-      docxPreviewRef.current.innerHTML = '<p class="text-red-500 p-4">Error loading document preview</p>';
-    });
-  }
-}, [previewFile, previewFileType]);
+    if (previewingFile?.file && typeof previewingFile.file === 'string' && previewingFile.file.startsWith('blob:')) {
+      URL.revokeObjectURL(previewingFile.file);
+    }
+    
+    setPreviewingFile(null);
+  };
 
-const onDocumentLoadSuccess = ({ numPages }) => {
-  setNumPages(numPages);
-  setPageNumber(1);
-};
+  const onDocumentLoadSuccess = ({ numPages }) => {
+    setNumPages(numPages);
+    setPageNumber(1);
+  };
 
-const goToPrevPage = () => {
-  setPageNumber(prev => Math.max(prev - 1, 1));
-};
+  const goToPrevPage = () => {
+    setPageNumber(prev => Math.max(prev - 1, 1));
+  };
 
-const goToNextPage = () => {
-  setPageNumber(prev => Math.min(prev + 1, numPages));
-};
+  const goToNextPage = () => {
+    setPageNumber(prev => Math.min(prev + 1, numPages));
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-[#062e69] to-slate-800 flex relative overflow-hidden">
@@ -154,7 +241,8 @@ const goToNextPage = () => {
       />
 
       {/* Notification Permission Button */}
-      {notificationHelper.isSupported() && notificationPermission !== "granted" && (
+      {
+      notificationHelper.isSupported() && notificationPermission !== "granted" && (
         <div className="fixed top-20 right-4 z-50">
           <button
             onClick={handleRequestNotificationPermission}
@@ -448,6 +536,92 @@ const goToNextPage = () => {
             </div>
           )}
 
+          {/* Translation Jobs Status Display */}
+          {translationJobs.length > 0 && (
+            <div className="mb-8 animate-slide-up delay-500">
+              <div className="bg-white/90 backdrop-blur-xl border border-[#062e69]/30 rounded-2xl p-4 shadow-lg">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-[#062e69] flex items-center space-x-2">
+                    <Languages className="w-5 h-5" />
+                    <span>Translation Jobs ({translationJobs.length})</span>
+                  </h3>
+                  <button
+                    onClick={handleDownloadAll}
+                    className="flex items-center space-x-2 bg-[#062e69] text-white px-4 py-2 rounded-lg hover:bg-[#062e69]/90 transition-colors text-sm"
+                  >
+                    <DownloadCloud className="w-4 h-4" />
+                    <span>Download All</span>
+                  </button>
+                </div>
+                
+                <div className="space-y-3">
+                  {translationJobs.map((job) => {
+                    const status = jobStatuses[job.job_id];
+                    return (
+                      <div
+                        key={job.job_id}
+                        className="bg-[#062e69]/5 rounded-lg p-4 border border-[#062e69]/10 hover:bg-[#062e69]/10 transition-all duration-200"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-3 flex-1 min-w-0">
+                            {getFileIcon(job.filename, "")}
+                            <div className="flex-1 min-w-0">
+                              <div className="text-[#062e69] font-medium text-sm truncate">
+                                {job.filename}
+                              </div>
+                              <div className="text-[#062e69]/60 text-xs">
+                                Target: {job.target_language}
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center space-x-3">
+                            {/* Status */}
+                            <div className={`px-3 py-1 rounded-full text-xs font-medium border flex items-center space-x-1 ${getStatusColor(status?.status || 'PENDING')}`}>
+                              {getStatusIcon(status?.status || 'PENDING')}
+                              <span>{status?.status || 'PENDING'}</span>
+                            </div>
+                            
+                            {/* Preview Button */}
+                            {status?.status === 'COMPLETED' && (
+                              <button
+                                onClick={() => {
+                                  setSelectedJobForPreview(job.job_id);
+                                  setShowPreview(true);
+                                }}
+                                className="p-2 text-[#062e69]/70 hover:text-[#062e69] hover:bg-[#062e69]/10 rounded-lg transition-colors"
+                                title="Preview"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </button>
+                            )}
+                            
+                            {/* Download Button */}
+                            {status?.status === 'COMPLETED' && (
+                              <button
+                                onClick={() => handleDownload(job.job_id)}
+                                className="p-2 text-[#062e69]/70 hover:text-[#062e69] hover:bg-[#062e69]/10 rounded-lg transition-colors"
+                                title="Download"
+                              >
+                                <Download className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                        
+                        {status?.updated_at && (
+                          <div className="mt-2 text-xs text-[#062e69]/50">
+                            Last updated: {new Date(status.updated_at).toLocaleString()}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Action Buttons */}
           <div className="flex flex-wrap justify-center gap-4 animate-slide-up delay-400">
             <button
@@ -571,113 +745,154 @@ const goToNextPage = () => {
 
       {/* Preview Panel */}
       {showPreview && (
-  <div className="w-1/2 p-2 bg-white/5 backdrop-blur-sm border-l border-white/10 animate-slide-in-right">
-    <div className="h-full bg-white/95 backdrop-blur-xl border border-[#062e69]/30 rounded-2xl shadow-lg flex flex-col overflow-y-auto max-h-screen">
-      {/* Preview Header */}
-      <div className="flex items-center justify-between p-4 border-b border-[#062e69]/10">
-        <div className="flex items-center space-x-2">
-          <Eye className="w-5 h-5 text-[#062e69]" />
-          <h3 className="text-lg font-semibold text-[#062e69]">
-            Translation Preview
-          </h3>
-          <p className="pl-5 text-lg">Accuracy: {percentage}%</p>
-        </div>
-        <button
-          onClick={() => {
-            setShowPreview(false);
-            setPageNumber(1);
-          }}
-          className="p-1 text-[#062e69]/60 hover:text-[#062e69] transition-colors rounded-lg hover:bg-[#062e69]/10"
-        >
-          <X className="w-5 h-5" />
-        </button>
-      </div>
+        <div className="w-1/2 p-2 bg-white/5 backdrop-blur-sm border-l border-white/10 animate-slide-in-right">
+          <div className="h-full bg-white/95 backdrop-blur-xl border border-[#062e69]/30 rounded-2xl shadow-lg flex flex-col overflow-y-auto max-h-screen">
+            {/* Preview Header */}
+            <div className="flex items-center justify-between p-4 border-b border-[#062e69]/10">
+              <div className="flex items-center space-x-2">
+                <Eye className="w-5 h-5 text-[#062e69]" />
+                <h3 className="text-lg font-semibold text-[#062e69]">
+                  Translation Preview
+                </h3>
+                <p className="pl-5 text-lg">Accuracy: {percentage}%</p>
+              </div>
+              <button
+                onClick={handleClosePreview}
+                className="p-1 text-[#062e69]/60 hover:text-[#062e69] transition-colors rounded-lg hover:bg-[#062e69]/10"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
-      {/* Preview Content */}
-      <div className="flex-1 p-4 overflow-y-auto">
-        {previewFile && previewFileType === 'pdf' ? (
-          <div className="flex flex-col items-center">
-            <Document
-              file={previewFile}
-              onLoadSuccess={onDocumentLoadSuccess}
-              loading={
-                <div className="flex items-center justify-center p-8">
-                  <Loader2 className="w-8 h-8 animate-spin text-[#062e69]" />
-                </div>
-              }
-              error={
-                <div className="text-red-500 p-4 text-center">
-                  Error loading PDF. Please try downloading the file.
-                </div>
-              }
-            >
-              <Page
-                pageNumber={pageNumber}
-                renderTextLayer={true}
-                renderAnnotationLayer={true}
-                className="shadow-lg"
-                width={Math.min(window.innerWidth * 0.4, 800)}
-              />
-            </Document>
-            
-            {numPages && numPages > 1 && (
-              <div className="mt-4 flex items-center gap-4 bg-[#062e69]/10 px-4 py-2 rounded-lg">
-                <button
-                  onClick={goToPrevPage}
-                  disabled={pageNumber <= 1}
-                  className="px-3 py-1 bg-[#062e69] text-white rounded disabled:opacity-50 disabled:cursor-not-allowed"
+            {/* File Selection */}
+            {translationJobs.length > 1 && (
+              <div className="p-4 border-b border-[#062e69]/10">
+                <label className="text-sm font-medium text-[#062e69]/70 mb-2 block">
+                  Select file to preview:
+                </label>
+                <select
+                  value={selectedJobForPreview || ''}
+                  onChange={(e) => setSelectedJobForPreview(e.target.value)}
+                  className="w-full p-2 border border-[#062e69]/30 rounded-lg bg-white text-[#062e69] focus:outline-none focus:border-[#062e69]/50"
                 >
-                  Previous
-                </button>
-                <span className="text-[#062e69] font-medium">
-                  Page {pageNumber} of {numPages}
-                </span>
-                <button
-                  onClick={goToNextPage}
-                  disabled={pageNumber >= numPages}
-                  className="px-3 py-1 bg-[#062e69] text-white rounded disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Next
-                </button>
+                  <option value="">Choose a file...</option>
+                  {translationJobs
+                    .filter(job => jobStatuses[job.job_id]?.status === 'COMPLETED')
+                    .map(job => (
+                      <option key={job.job_id} value={job.job_id}>
+                        {job.filename}
+                      </option>
+                    ))}
+                </select>
               </div>
             )}
-          </div>
-        ) : previewFile && previewFileType === 'docx' ? (
-          <div 
-            ref={docxPreviewRef}
-            className="docx-preview-container bg-white p-4 rounded-lg shadow-inner"
-            style={{
-              minHeight: '500px',
-              maxWidth: '100%',
-              overflow: 'auto'
-            }}
-          />
-        ) : (
-          <div className="flex items-center justify-center h-full text-[#062e69]/60">
-            <div className="text-center">
-              <FileText className="w-12 h-12 mx-auto mb-2 opacity-40" />
-              <p className="text-sm">
-                {translationResult ? 'Preview not available for this file type' : 'No preview available'}
-              </p>
+
+            {/* Preview Content */}
+            <div className="flex-1 p-4 overflow-y-auto">
+              {previewingFile && previewingFile.type === 'pdf' ? (
+                <div className="flex flex-col items-center">
+                  <Document
+                    file={previewingFile.file} // This will now be a blob URL string
+                    onLoadSuccess={onDocumentLoadSuccess}
+                    loading={
+                      <div className="flex items-center justify-center p-8">
+                        <Loader2 className="w-8 h-8 animate-spin text-[#062e69]" />
+                      </div>
+                    }
+                    error={
+                      <div className="text-red-500 p-4 text-center">
+                        <p className="mb-2">Error loading PDF preview.</p>
+                        <p className="text-sm text-gray-600">
+                          The translated file is still available for download below.
+                        </p>
+                      </div>
+                    }
+                    onLoadError={(error) => {
+                      console.error('PDF load error:', error);
+                    }}
+                  >
+                    <Page
+                      pageNumber={pageNumber}
+                      renderTextLayer={true}
+                      renderAnnotationLayer={true}
+                      className="shadow-lg"
+                      width={Math.min(window.innerWidth * 0.4, 800)}
+                      onLoadError={(error) => {
+                        console.error('PDF page load error:', error);
+                      }}
+                    />
+                  </Document>
+                  
+                  {numPages && numPages > 1 && (
+                    <div className="mt-4 flex items-center gap-4 bg-[#062e69]/10 px-4 py-2 rounded-lg">
+                      <button
+                        onClick={goToPrevPage}
+                        disabled={pageNumber <= 1}
+                        className="px-3 py-1 bg-[#062e69] text-white rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Previous
+                      </button>
+                      <span className="text-[#062e69] font-medium">
+                        Page {pageNumber} of {numPages}
+                      </span>
+                      <button
+                        onClick={goToNextPage}
+                        disabled={pageNumber >= numPages}
+                        className="px-3 py-1 bg-[#062e69] text-white rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : previewingFile && previewingFile.type === 'docx' ? (
+                <div 
+                  ref={docxPreviewRef}
+                  className="docx-preview-container bg-white p-4 rounded-lg shadow-inner"
+                  style={{
+                    minHeight: '500px',
+                    maxWidth: '100%',
+                    overflow: 'auto'
+                  }}
+                />
+              ) : selectedJobForPreview ? (
+                <div className="flex items-center justify-center h-full text-[#062e69]/60">
+                  <div className="text-center">
+                    <Loader2 className="w-12 h-12 mx-auto mb-2 opacity-40 animate-spin" />
+                    <p className="text-sm">Loading preview...</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-full text-[#062e69]/60">
+                  <div className="text-center">
+                    <FileText className="w-12 h-12 mx-auto mb-2 opacity-40" />
+                    <p className="text-sm">
+                      {translationJobs.length > 0 ? 'Select a completed file to preview' : 'No files available for preview'}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Download Button */}
+            <div className="p-4 border-t border-[#062e69]/10">
+              <button
+                onClick={() => selectedJobForPreview && handleDownload(selectedJobForPreview)}
+                disabled={!selectedJobForPreview || !jobStatuses[selectedJobForPreview]?.download_id}
+                className="w-full bg-gradient-to-r from-[#062e69] to-[#062e69]/80 hover:from-[#062e69]/90 hover:to-[#062e69] text-white px-4 py-3 rounded-xl font-medium transition-all duration-200 transform hover:scale-105 hover:shadow-lg hover:shadow-[#062e69]/25 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+              >
+                <Download className="w-4 h-4" />
+                <span>
+                  {selectedJobForPreview 
+                    ? `Download ${translationJobs.find(j => j.job_id === selectedJobForPreview)?.filename || 'File'}`
+                    : 'Select file to download'
+                  }
+                </span>
+              </button>
             </div>
           </div>
-        )}
-      </div>
-
-      {/* Download Button */}
-      <div className="p-4 border-t border-[#062e69]/10">
-        <button
-          onClick={handleDownload}
-          disabled={!translationResult?.file_id}
-          className="w-full bg-gradient-to-r from-[#062e69] to-[#062e69]/80 hover:from-[#062e69]/90 hover:to-[#062e69] text-white px-4 py-3 rounded-xl font-medium transition-all duration-200 transform hover:scale-105 hover:shadow-lg hover:shadow-[#062e69]/25 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-        >
-          <Download className="w-4 h-4" />
-          <span>Download Translated File</span>
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+        </div>
+      )}
     </div>
   );
 };

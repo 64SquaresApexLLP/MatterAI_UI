@@ -22,22 +22,25 @@ const LANGUAGE_MAPPING = {
 };
 
 export const translationAPI = {
-  translate: async (file, targetLanguage) => {
-    console.log('=== Translation Request Debug ===');
-    console.log('File object:', file);
-    console.log('File name:', file.name);
-    console.log('File type:', file.type);
-    console.log('File size:', file.size);
+  translateFileConvo: async (files, targetLanguage) => {
+    console.log('=== Translation File Convo Request Debug ===');
+    console.log('Files:', files);
+    console.log('Files count:', files.length);
     console.log('Target language:', targetLanguage);
 
     const formData = new FormData();
-    formData.append('file', file.file);
+    
+    // Add multiple files to FormData
+    files.forEach((file, index) => {
+      console.log(`File ${index}:`, file.name, file.type, file.size);
+      formData.append('files', file.file);
+    });
     
     const backendLanguage = LANGUAGE_MAPPING[targetLanguage] || targetLanguage.toLowerCase();
     console.log('Backend language:', backendLanguage);
-    formData.append('target_language', backendLanguage);
+    formData.append('prompt', `Translate to ${backendLanguage}`);
 
-    const response = await fetch(`${TRANSLATION_API_BASE_URL}/translate`, {
+    const response = await fetch(`${TRANSLATION_API_BASE_URL}/translate_file_convo`, {
       method: 'POST',
       body: formData,
     });
@@ -49,6 +52,19 @@ export const translationAPI = {
 
     const data = await response.json();
     return data;
+  },
+
+  checkStatus: async (jobId) => {
+    const response = await fetch(`${TRANSLATION_API_BASE_URL}/status/${jobId}`, {
+      method: 'GET',
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+      throw new Error(errorData.detail || `HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    return await response.json();
   },
 
   translateText: async (text, targetLanguage) => {
@@ -73,9 +89,9 @@ export const translationAPI = {
     return await response.json();
   },
 
-  download: async (file) => {
-    console.log("download file:", file)
-    const response = await fetch(`${TRANSLATION_API_BASE_URL}/download/${file}`, {
+  download: async (downloadId) => {
+    console.log("download downloadId:", downloadId)
+    const response = await fetch(`${TRANSLATION_API_BASE_URL}/download/${downloadId}`, {
       method: 'GET',
     });
 
@@ -106,42 +122,50 @@ export const notificationHelper = {
   },
 
   getPermission: () => {
-    if (!notificationHelper.isSupported()) return "unsupported";
     return Notification.permission;
   },
 
   requestPermission: async () => {
     if (!notificationHelper.isSupported()) {
-      return "unsupported";
+      throw new Error("Notifications not supported");
     }
-
-    try {
-      const permission = await Notification.requestPermission();
-      return permission;
-    } catch (error) {
-      console.error("Error requesting notification permission:", error);
-      return "denied";
-    }
+    return await Notification.requestPermission();
   },
 
   show: (title, options = {}) => {
+    console.log('Attempting to show notification:', title);
+    console.log('Current permission:', Notification.permission);
+    
     if (!notificationHelper.isSupported()) {
-      console.warn("Notifications not supported");
+      console.error("Notifications not supported");
       return null;
     }
 
     if (Notification.permission === "granted") {
-      const notification = new Notification(title, {
-        icon: "/favicon.ico",
-        badge: "/favicon.ico",
-        ...options
-      });
+      try {
+        const notification = new Notification(title, {
+          icon: "/favicon.ico",
+          badge: "/favicon.ico",
+          ...options
+        });
 
-      setTimeout(() => notification.close(), 5000);
+        notification.onclick = () => {
+          console.log('Notification clicked');
+          window.focus();
+        };
 
-      return notification;
+        notification.onerror = (error) => {
+          console.error('Notification error:', error);
+        };
+
+        setTimeout(() => notification.close(), 5000);
+        return notification;
+      } catch (error) {
+        console.error('Failed to create notification:', error);
+        return null;
+      }
     } else {
-      console.warn("Notification permission not granted");
+      console.warn(`Notification permission not granted: ${Notification.permission}`);
       return null;
     }
   }
@@ -180,6 +204,8 @@ export const useHomeLogic = () => {
   const [isDragOver, setIsDragOver] = useState(false);
   const [isTranslating, setIsTranslating] = useState(false);
   const [translationResult, setTranslationResult] = useState(null);
+  const [translationJobs, setTranslationJobs] = useState([]);
+  const [jobStatuses, setJobStatuses] = useState({});
   const [previewText, setPreviewText] = useState("");
   const [showPreview, setShowPreview] = useState(false);
   const fileInputRef = useRef(null);
@@ -191,6 +217,7 @@ export const useHomeLogic = () => {
   const [notificationPermission, setNotificationPermission] = useState("default");
   const [previewFile, setPreviewFile] = useState(null);
   const [previewFileType, setPreviewFileType] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
 
   useEffect(() => {
     const randomPercentage = Math.floor(Math.random() * (80 - 60 + 1)) + 60;
@@ -200,6 +227,14 @@ export const useHomeLogic = () => {
       setNotificationPermission(Notification.permission);
     }
   }, []);
+
+  useEffect(() => {
+    return () => {
+      if (previewUrl && previewUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
 
   useEffect(() => {
     const SpeechRecognition =
@@ -230,27 +265,85 @@ export const useHomeLogic = () => {
     }
   }, []);
 
+  // Poll job status
+  const pollJobStatus = async (jobId, filename) => {
+    const maxAttempts = 60; // 5 minutes with 5-second intervals
+    let attempts = 0;
+
+    const poll = async () => {
+      try {
+        attempts++;
+        const status = await translationAPI.checkStatus(jobId);
+        
+        setJobStatuses(prev => ({
+          ...prev,
+          [jobId]: status
+        }));
+
+        if (status.status === 'COMPLETED') {
+          // Show completion notification
+          notificationHelper.show(
+            'Translation Complete', 
+            { body: `${filename} has been translated successfully!` }
+          );
+          return status;
+        } else if (status.status === 'FAILED') {
+          throw new Error(`Translation failed for ${filename}`);
+        } else if (attempts < maxAttempts) {
+          // Continue polling
+          setTimeout(poll, 5000);
+        } else {
+          throw new Error(`Translation timeout for ${filename}`);
+        }
+      } catch (error) {
+        console.error(`Status check error for ${filename}:`, error);
+        setJobStatuses(prev => ({
+          ...prev,
+          [jobId]: { status: 'FAILED', error: error.message }
+        }));
+      }
+    };
+
+    poll();
+  };
+
   const handleRequestNotificationPermission = async () => {
+    console.log('Current permission:', notificationHelper.getPermission());
+    console.log('Browser supports notifications:', notificationHelper.isSupported());
+
     if (!notificationHelper.isSupported()) {
-      toast ? toast.error("Notifications are not supported in this browser") : 
-             alert("Notifications are not supported in this browser");
+      const message = "Notifications are not supported in this browser";
+      toast ? toast.error(message) : alert(message);
       return;
     }
 
-    const permission = await notificationHelper.requestPermission();
-    setNotificationPermission(permission);
+    try {
+      const permission = await notificationHelper.requestPermission();
+      setNotificationPermission(permission);
 
-    if (permission === "granted") {
-      toast ? toast.success("Notifications enabled successfully!") : 
-             alert("Notifications enabled successfully!");
-      
-      notificationHelper.show("Notifications Enabled", {
-        body: "You'll be notified when translations are complete",
-        tag: "permission-granted"
-      });
-    } else if (permission === "denied") {
-      toast ? toast.error("Notification permission denied. You can enable it in your browser settings.") : 
-             alert("Notification permission denied. You can enable it in your browser settings.");
+      if (permission === "granted") {
+        const message = "Notifications enabled successfully!";
+        toast ? toast.success(message) : alert(message);
+
+        // Show test notification
+        setTimeout(() => {
+          notificationHelper.show("Notifications Enabled", {
+            body: "You'll be notified when translations are complete",
+            tag: "permission-granted"
+          });
+        }, 500);
+
+      } else if (permission === "denied") {
+        const message = "Notification permission denied. You can enable it in your browser settings.";
+        toast ? toast.error(message) : alert(message);
+      } else {
+        const message = "Notification permission was not granted.";
+        toast ? toast.warning(message) : alert(message);
+      }
+    } catch (error) {
+      console.error('Permission request failed:', error);
+      const message = "Failed to request notification permission";
+      toast ? toast.error(message) : alert(message);
     }
   };
   
@@ -301,6 +394,8 @@ export const useHomeLogic = () => {
 
     if (buttonName !== "Translation") {
       setTranslationResult(null);
+      setTranslationJobs([]);
+      setJobStatuses({});
       setTextTranslationResult(null);
       setPreviewText("");
       setPreviewFile(null);
@@ -316,104 +411,70 @@ export const useHomeLogic = () => {
   };
 
   const handleTranslateFiles = async () => {
-    if (selectedButton !== "Translation") {
-      const message = "Please select Translation option first";
-      toast ? toast.error(message) : alert(message);
-      return;
-    }
+  if (selectedButton !== "Translation") {
+    const message = "Please select Translation option first";
+    toast ? toast.error(message) : alert(message);
+    return;
+  }
 
-    if (!selectedLanguage) {
-      const message = "Please select a target language";
-      toast ? toast.error(message) : alert(message);
-      return;
-    }
+  if (!selectedLanguage) {
+    const message = "Please select a target language";
+    toast ? toast.error(message) : alert(message);
+    return;
+  }
 
-    if (uploadedFiles.length === 0) {
-      const message = "Please upload files to translate";
-      toast ? toast.error(message) : alert(message);
-      return;
-    }
+  if (uploadedFiles.length === 0) {
+    const message = "Please upload files to translate";
+    toast ? toast.error(message) : alert(message);
+    return;
+  }
 
-    const fileToTranslate = uploadedFiles[0];
+  setIsTranslating(true);
+  const translatingToast = toast ? toast.loading(`Translating ${uploadedFiles.length} file(s)...`) : null;
+
+  try {
+    // This will now send all files + prompt directly to /translate_file_convo
+    const result = await translationAPI.translateFileConvo(uploadedFiles, selectedLanguage);
     
-    setIsTranslating(true);
-    const translatingToast = toast ? toast.loading("Translating your document...") : null;
-
-    try {
-      const result = await translationAPI.translate(fileToTranslate, selectedLanguage);
-      
-      if (toast) {
-        toast.update(translatingToast, {
-          render: "Translation completed successfully!",
-          type: "success",
-          isLoading: false,
-          autoClose: 3000,
-        });
-      } else {
-        alert("Translation completed successfully!");
-      }
-
-      setTranslationResult(result);
-      
-      // Download the file for preview instead of using preview text
-      if (result.file_id) {
-        try {
-          const response = await translationAPI.download(result.file_id);
-          const blob = await response.blob();
-
-          const blobUrl = URL.createObjectURL(blob);
-          
-          // Determine file type from content-type or original file
-          const contentType = response.headers.get('content-type');
-          let fileType = null;
-          
-          if (contentType) {
-            if (contentType.includes('application/pdf')) {
-              fileType = 'pdf';
-            } else if (contentType.includes('application/vnd.openxmlformats-officedocument.wordprocessingml.document')) {
-              fileType = 'docx';
-            }
-          }
-          
-          // Fallback to original file extension
-          if (!fileType) {
-            if (fileToTranslate.name.toLowerCase().endsWith('.pdf')) {
-              fileType = 'pdf';
-            } else if (fileToTranslate.name.toLowerCase().endsWith('.docx')) {
-              fileType = 'docx';
-            }
-          }
-          
-          setPreviewFile(blobUrl);
-          setPreviewFileType(fileType);
-          setShowPreview(true);
-          
-        } catch (previewError) {
-          console.error("Error loading preview:", previewError);
-          setShowPreview(true); // Still show the panel with download option
-        }
-      } else {
-        setShowPreview(true);
-      }
-
-    } catch (error) {
-      console.error("Translation error:", error);
-      const errorMessage = `Translation failed: ${error.message}`;
-      
-      if (toast) {
-        toast.update(translatingToast, {
-          render: errorMessage,
-          type: "error",
-          isLoading: false,
-          autoClose: 5000,
-        });
-      } else {
-        alert(errorMessage);
-      }
-    } finally {
-      setIsTranslating(false);
+    if (toast) {
+      toast.update(translatingToast, {
+        render: result.response,
+        type: "success",
+        isLoading: false,
+        autoClose: 5000,
+      });
+    } else {
+      alert(result.response);
     }
-  };
+
+    setTranslationResult(result);
+    setTranslationJobs(result.jobs);
+    
+    // Start polling for each job
+    result.jobs.forEach(job => {
+      pollJobStatus(job.job_id, job.filename);
+    });
+
+    setShowPreview(true);
+
+  } catch (error) {
+    console.error("Translation error:", error);
+    const errorMessage = `Translation failed: ${error.message}`;
+    
+    if (toast) {
+      toast.update(translatingToast, {
+        render: errorMessage,
+        type: "error",
+        isLoading: false,
+        autoClose: 5000,
+      });
+    } else {
+      alert(errorMessage);
+    }
+  } finally {
+    setIsTranslating(false);
+  }
+};
 
   const handleTranslateText = async () => {
     if (!selectedLanguage) {
@@ -504,91 +565,136 @@ export const useHomeLogic = () => {
     }
   };
 
-  const handleFileUpload = async (files) => {
-    const fileArray = Array.from(files);
-    
-    if (selectedButton === "Translation") {
-      const validFiles = [];
-      const invalidFiles = [];
+const handleFileUpload = async (files) => {
+  const fileArray = Array.from(files);
+  
+  if (selectedButton === "Translation") {
+    // For translation mode, ONLY handle files locally - no server upload
+    const validFiles = [];
+    const invalidFiles = [];
 
-      fileArray.forEach(file => {
-        const validTypes = [
-          "application/pdf",
-          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-          "application/vnd.openxmlformats-officedocument.presentationml.presentation"
-        ];
-        
-        const isValidType = validTypes.includes(file.type) || file.name.match(/\.(pdf|docx|pptx)$/i);
+    fileArray.forEach(file => {
+      const validTypes = [
+        "application/pdf",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+      ];
+      
+      const isValidType = validTypes.includes(file.type) || file.name.match(/\.(pdf|docx|pptx)$/i);
 
-        if (isValidType) {
-          const fileObj = {
-            id: Date.now() + Math.random(),
-            name: file.name,
-            size: file.size,
-            type: file.type,
-            file: file
-          };
-          validFiles.push(fileObj);
-        } else {
-          invalidFiles.push(file.name);
-        }
-      });
-
-      if (validFiles.length > 0) {
-        setUploadedFiles(prev => [...prev, ...validFiles]);
-        const message = `${validFiles.length} file(s) uploaded successfully`;
-        toast ? toast.success(message) : console.log(message);
+      if (isValidType) {
+        const fileObj = {
+          id: Date.now() + Math.random(),
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          file: file
+        };
+        validFiles.push(fileObj);
+      } else {
+        invalidFiles.push(file.name);
       }
+    });
 
-      if (invalidFiles.length > 0) {
-        const message = `Invalid files (only PDF, DOCX, PPTX allowed): ${invalidFiles.join(', ')}`;
-        toast ? toast.error(message) : alert(message);
-      }
-    } else {
-      const validFiles = fileArray.filter((file) => {
-        const validTypes = [
-          "application/pdf",
-          "application/msword",
-          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-          "text/plain",
-          "application/vnd.ms-excel",
-          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        ];
-        return (
-          validTypes.includes(file.type) ||
-          file.name.match(/\.(pdf|doc|docx|txt|xls|xlsx)$/i)
-        );
-      });
-
-      try {
-        const uploadPromises = validFiles.map((file) =>
-          queryAPI.uploadFile(file)
-        );
-        const uploadResults = await Promise.all(uploadPromises);
-
-        const successfulUploads = uploadResults
-          .filter((result) => result.success)
-          .map((result) => result.file);
-
-        setUploadedFiles((prev) => [...prev, ...successfulUploads]);
-
-        if (successfulUploads.length > 0) {
-          console.log(`Successfully uploaded ${successfulUploads.length} files`);
-        }
-
-        const failedUploads = uploadResults.filter((result) => !result.success);
-        if (failedUploads.length > 0) {
-          console.error("Some files failed to upload:", failedUploads);
-          const message = `${failedUploads.length} files failed to upload`;
-          toast ? toast.error(message) : alert(message);
-        }
-      } catch (error) {
-        console.error("File upload error:", error);
-        const message = `File upload failed: ${error.message}`;
-        toast ? toast.error(message) : alert(message);
-      }
+    if (validFiles.length > 0) {
+      setUploadedFiles(prev => [...prev, ...validFiles]);
+      const message = `${validFiles.length} file(s) ready for translation`;
+      toast ? toast.success(message) : console.log(message);
     }
-  };
+
+    if (invalidFiles.length > 0) {
+      const message = `Invalid files (only PDF, DOCX, PPTX allowed): ${invalidFiles.join(', ')}`;
+      toast ? toast.error(message) : alert(message);
+    }
+
+    // Return early - no server upload for translation files
+    return;
+  }
+
+  // For other modes (non-translation), validate files first
+  const validFiles = fileArray.filter((file) => {
+    const validTypes = [
+      "application/pdf",
+      "application/msword", 
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "text/plain",
+      "application/vnd.ms-excel",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ];
+    return (
+      validTypes.includes(file.type) ||
+      file.name.match(/\.(pdf|doc|docx|txt|xls|xlsx)$/i)
+    );
+  });
+
+  if (validFiles.length === 0) {
+    const message = "No valid files to upload";
+    toast ? toast.error(message) : alert(message);
+    return;
+  }
+
+  // Upload to server only for non-translation modes
+  try {
+    const uploadPromises = validFiles.map((file) =>
+      queryAPI.uploadFile(file).catch(error => {
+        console.error(`Failed to upload ${file.name}:`, error);
+        return { success: false, error: error.message, fileName: file.name };
+      })
+    );
+    const uploadResults = await Promise.all(uploadPromises);
+
+    const successfulUploads = uploadResults
+      .filter((result) => result.success)
+      .map((result) => result.file);
+
+    if (successfulUploads.length > 0) {
+      setUploadedFiles((prev) => [...prev, ...successfulUploads]);
+      const message = `Successfully uploaded ${successfulUploads.length} files`;
+      toast ? toast.success(message) : console.log(message);
+    }
+
+    const failedUploads = uploadResults.filter((result) => !result.success);
+    if (failedUploads.length > 0) {
+      console.error("Some files failed to upload:", failedUploads);
+      
+      // Add failed files locally so user can still work with them
+      const localFiles = validFiles
+        .filter(file => failedUploads.some(failed => failed.fileName === file.name))
+        .map(file => ({
+          id: Date.now() + Math.random(),
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          file: file,
+          uploadFailed: true
+        }));
+
+      if (localFiles.length > 0) {
+        setUploadedFiles((prev) => [...prev, ...localFiles]);
+      }
+
+      const message = `${failedUploads.length} files added locally (server upload failed)`;
+      toast ? toast.warning(message) : console.warn(message);
+    }
+  } catch (error) {
+    console.error("File upload error:", error);
+    
+    // Fallback: add files locally
+    const localFiles = validFiles.map(file => ({
+      id: Date.now() + Math.random(),
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      file: file,
+      uploadFailed: true
+    }));
+
+    setUploadedFiles((prev) => [...prev, ...localFiles]);
+    
+    const message = `Files added locally (server unavailable)`;
+    toast ? toast.warning(message) : console.warn(message);
+  }
+};
 
   const handleFileInputChange = (e) => {
     handleFileUpload(e.target.files);
@@ -614,6 +720,8 @@ export const useHomeLogic = () => {
     setUploadedFiles(prev => prev.filter(file => file.id !== fileId));
     if (translationResult) {
       setTranslationResult(null);
+      setTranslationJobs([]);
+      setJobStatuses({});
       setPreviewText("");
       setPreviewFile(null);
       setPreviewFileType(null);
@@ -621,9 +729,10 @@ export const useHomeLogic = () => {
     }
   };
 
-  const handleDownload = async () => {
-    if (!translationResult?.file_id) {
-      const message = "No file available for download";
+  const handleDownload = async (jobId) => {
+    const jobStatus = jobStatuses[jobId];
+    if (!jobStatus?.download_id) {
+      const message = "No download available yet. Please wait for translation to complete.";
       toast ? toast.error(message) : alert(message);
       return;
     }
@@ -631,22 +740,11 @@ export const useHomeLogic = () => {
     const downloadToast = toast ? toast.loading("Preparing download...") : null;
 
     try {
-      const response = await translationAPI.download(translationResult.file_id);
+      const response = await translationAPI.download(jobStatus.download_id);
       const blob = await response.blob();
 
       const contentDisposition = response.headers.get('content-disposition');
-      let filename = 'translated_document';
-
-      const contentType = response.headers.get('content-type');
-      let fileExtension = '';
-
-      if (contentType) {
-        if (contentType.includes('application/vnd.openxmlformats-officedocument.wordprocessingml.document')) {
-          fileExtension = '.docx';
-        } else if (contentType.includes('application/pdf')) {
-          fileExtension = '.pdf';
-        }
-      }
+      let filename = jobStatus.filename || 'translated_document';
 
       if (contentDisposition && contentDisposition.includes('filename=')) {
         filename = contentDisposition
@@ -654,8 +752,6 @@ export const useHomeLogic = () => {
           .split(';')[0]
           .replace(/"/g, '');
       }
-
-      filename = filename.endsWith(fileExtension) ? filename : filename + fileExtension;
 
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -669,15 +765,14 @@ export const useHomeLogic = () => {
 
       if (toast) {
         toast.update(downloadToast, {
-          render: "File downloaded successfully!",
+          render: `${filename} downloaded successfully!`,
           type: "success",
           isLoading: false,
           autoClose: 3000,
         });
       } else {
-        alert("File downloaded successfully!");
+        alert(`${filename} downloaded successfully!`);
       }
-
     } catch (error) {
       console.error("Download error:", error);
       const errorMessage = `Download failed: ${error.message}`;
@@ -695,6 +790,25 @@ export const useHomeLogic = () => {
     }
   };
 
+  const handleDownloadAll = async () => {
+    const completedJobs = Object.entries(jobStatuses).filter(
+      ([jobId, status]) => status.status === 'COMPLETED' && status.download_id
+    );
+
+    if (completedJobs.length === 0) {
+      const message = "No completed translations available for download yet.";
+      toast ? toast.error(message) : alert(message);
+      return;
+    }
+
+    // Download each completed file
+    for (const [jobId, status] of completedJobs) {
+      await handleDownload(jobId);
+      // Small delay between downloads to prevent overwhelming the browser
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+  };
+
   return {
     percentage,
     query,
@@ -708,6 +822,8 @@ export const useHomeLogic = () => {
     isDragOver,
     isTranslating,
     translationResult,
+    translationJobs,
+    jobStatuses,
     previewText,
     showPreview,
     setShowPreview,
@@ -732,6 +848,7 @@ export const useHomeLogic = () => {
     handleDragLeave,
     handleDrop,
     removeFile,
-    handleDownload
+    handleDownload,
+    handleDownloadAll
   };
 };
