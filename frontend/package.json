@@ -11,10 +11,13 @@
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.12",
+    "docx-preview": "^0.3.7",
     "framer-motion": "^12.23.12",
     "lucide-react": "^0.542.0",
+    "pdfjs-dist": "^5.4.296",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
+    "react-pdf": "^10.2.0",
     "react-router-dom": "^7.8.2",
     "react-toastify": "^11.0.5",
     "tailwindcss": "^4.1.12"

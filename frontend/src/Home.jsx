@@ -1,7 +1,5 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, {useState, useRef, useEffect} from "react";
 import {
-  ChevronDown,
-  ChevronUp,
   Send,
   Mic,
   Paperclip,
@@ -15,636 +13,188 @@ import {
   Eye,
   Loader2,
   CheckCircle,
-  AlertCircle,
-  Upload
+  Upload,
+  Bell,
+  BellOff
 } from "lucide-react";
-import { toast, ToastContainer } from "react-toastify";
+import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import TimesheetForm from "./TimesheetForm";
 import TimesheetEntries from "./TimesheetEntries";
-import { queryAPI, authAPI } from "./api/apiService.js";
+import { 
+  useHomeLogic, 
+  notificationHelper, 
+  languages, 
+  formatFileSize 
+} from "./HomeLogic";
+import { Document, Page, pdfjs } from 'react-pdf';
+import 'react-pdf/dist/Page/AnnotationLayer.css';
+import 'react-pdf/dist/Page/TextLayer.css';
+import { renderAsync } from 'docx-preview';
 
-// Translation API Service
-const TRANSLATION_API_BASE_URL = import.meta.env.VITE_TRANSLATION_API_URL;
+// pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.6.347/pdf.worker.entry.min.js'
 
-// Language mapping to match backend expectations
-const LANGUAGE_MAPPING = {
-  "Chinese (Mandarin)": "simplified chinese",
-  "Japanese": "japanese",
-  "German": "german",
-  "French": "french", 
-  "Spanish": "spanish",
-  "Italian": "italian",
-  "English": "english",
-  "Korean": "korean",
-  "Swedish": "swedish",
-  "Danish": "danish",
-  "Finnish": "finnish",
-  "Dutch": "dutch"
-};
-
-const translationAPI = {
-  translate: async (file, targetLanguage) => {
-    console.log('=== Translation Request Debug ===');
-    console.log('File object:', file);
-    console.log('File name:', file.name);
-    console.log('File type:', file.type);
-    console.log('File size:', file.size);
-    console.log('Target language:', targetLanguage);
-
-    const formData = new FormData();
-    formData.append('file', file.file); // Use the actual file object
-    
-    // Map the display language to backend expected format
-    const backendLanguage = LANGUAGE_MAPPING[targetLanguage] || targetLanguage.toLowerCase();
-    console.log('Backend language:', backendLanguage);
-    formData.append('target_language', backendLanguage);
-
-    const response = await fetch(`${TRANSLATION_API_BASE_URL}/translate`, {
-      method: 'POST',
-      body: formData,
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
-      throw new Error(errorData.detail || `HTTP ${response.status}: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    return data;
-  },
-
-  translateText: async (text, targetLanguage) => {
-    const backendLanguage = LANGUAGE_MAPPING[targetLanguage] || targetLanguage.toLowerCase();
-    
-    const response = await fetch(`${TRANSLATION_API_BASE_URL}/translate_text`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        text: text,
-        target_language: backendLanguage
-      }),
-    });
-    
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
-      throw new Error(errorData.detail || `HTTP ${response.status}: ${response.statusText}`);
-    }
-    
-    return await response.json();
-  },
-
-  download: async (file) => {
-    const response = await fetch(`${TRANSLATION_API_BASE_URL}/download/${file}`, {
-      method: 'GET',
-    });
-
-    if (!response.ok) {
-      throw new Error('Download failed');
-    }
-
-    return response;
-  },
-
-  preview: async (fileId) => {
-    const response = await fetch(`${TRANSLATION_API_BASE_URL}/preview/${fileId}`, {
-      method: 'GET',
-    });
-
-    if (!response.ok) {
-      throw new Error('Preview failed');
-    }
-
-    return await response.json();
+const getFileIcon = (fileName, fileType) => {
+  if (fileType === "application/pdf" || fileName.endsWith(".pdf")) {
+    return <FileText className="w-4 h-4 text-red-400" />;
   }
+  if (fileType.includes("word") || fileName.match(/\.(doc|docx)$/i)) {
+    return <FileText className="w-4 h-4 text-blue-400" />;
+  }
+  if (fileType.includes("excel") || fileName.match(/\.(xls|xlsx)$/i)) {
+    return <FileText className="w-4 h-4 text-green-400" />;
+  }
+  if (fileType.includes("presentation") || fileName.match(/\.(ppt|pptx)$/i)) {
+    return <FileText className="w-4 h-4 text-orange-400" />;
+  }
+  return <File className="w-4 h-4 text-gray-400" />;
 };
 
 const Home = ({ user, onBack, onLogout }) => {
-  const [percentage, setPercentage] = useState(0);
-  const [query, setQuery] = useState("");
-  const [selectedButton, setSelectedButton] = useState(null);
-  const [selectedLanguage, setSelectedLanguage] = useState("");
-  const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
-  const [uploadedFiles, setUploadedFiles] = useState([]);
-  const [isDragOver, setIsDragOver] = useState(false);
-  const [isTranslating, setIsTranslating] = useState(false);
-  const [translationResult, setTranslationResult] = useState(null);
-  const [previewText, setPreviewText] = useState("");
-  const [showPreview, setShowPreview] = useState(false);
-  const fileInputRef = useRef(null);
-  const [showTimesheet, setShowTimesheet] = useState(false);
-  const [showEntries, setShowEntries] = useState(false);
-  const [isListening, setIsListening] = useState(false);
-  const recognitionRef = useRef(null);
-  const [textTranslationResult, setTextTranslationResult] = useState(null);
+  const {
+    percentage,
+    query,
+    setQuery,
+    selectedButton,
+    selectedLanguage,
+    showLanguageDropdown,
+    setShowLanguageDropdown,
+    uploadedFiles,
+    setUploadedFiles,
+    isDragOver,
+    isTranslating,
+    translationResult,
+    previewText,
+    showPreview,
+    setShowPreview,
+    fileInputRef,
+    showTimesheet,
+    setShowTimesheet,
+    showEntries,
+    setShowEntries,
+    isListening,
+    textTranslationResult,
+    setTextTranslationResult,
+    notificationPermission,
+    handleRequestNotificationPermission,
+    previewFile,
+    previewFileType, 
+    toggleListening,
+    handleButtonClick,
+    handleLanguageSelect,
+    handleSubmit,
+    handleFileInputChange,
+    handleDragOver,
+    handleDragLeave,
+    handleDrop,
+    removeFile,
+    handleDownload
+  } = useHomeLogic();
+
+  const [numPages, setNumPages] = useState(null);
+  const [pageNumber, setPageNumber] = useState(1);
+  const docxPreviewRef = useRef(null);
 
   useEffect(() => {
-    // Generate a random number between 60 and 80
-    const randomPercentage = Math.floor(Math.random() * (80 - 60 + 1)) + 60;
-    setPercentage(randomPercentage);
-  }, []);
-
-  useEffect(() => {
-    const SpeechRecognition =
-      window.SpeechRecognition || window.webkitSpeechRecognition;
-
-    if (SpeechRecognition) {
-      recognitionRef.current = new SpeechRecognition();
-      recognitionRef.current.continuous = true;
-      recognitionRef.current.interimResults = true;
-      recognitionRef.current.lang = "en-US";
-
-      recognitionRef.current.onresult = (event) => {
-        let interimTranscript = "";
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          const speechResult = event.results[i][0].transcript;
-          if (event.results[i].isFinal) {
-            setQuery((prev) => (prev + " " + speechResult).trim());
-          } else {
-            interimTranscript += speechResult;
-          }
-        }
-      };
-
-      recognitionRef.current.onerror = (event) => {
-        console.error("Speech recognition error", event.error);
-        setIsListening(false);
-      };
-    }
-  }, []);
-
-  const toggleListening = () => {
-    if (!recognitionRef.current) {
-      toast ? toast.error("Speech recognition not supported in this browser.") : 
-             alert("Speech recognition not supported in this browser.");
-      return;
-    }
-
-    if (isListening) {
-      recognitionRef.current.stop();
-      setIsListening(false);
-    } else {
-      recognitionRef.current.start();
-      setIsListening(true);
-    }
-  };
-
-  const languages = [
-    "Chinese (Mandarin)",
-    "German",
-    "French",
-    "Spanish",
-    "Italian",
-    "Swedish",
-    "Danish",
-    "Dutch",
-    "Finnish",
-    "Korean",
-    "Japanese",
-    "English",
-  ];
-
-  const handleButtonClick = (buttonName) => {
-    if (selectedButton === buttonName) {
-      setSelectedButton(null);
-    } else {
-      setSelectedButton(buttonName);
-    }
-
-    // Close timesheet form when selecting other buttons
-    if (buttonName !== "Timesheet" && showTimesheet) {
-      setShowTimesheet(false);
-    }
-
-    // Close entries view when selecting other buttons
-    if (buttonName !== "Entries" && showEntries) {
-      setShowEntries(false);
-    }
-
-    // Show timesheet form when Timesheet is selected
-    if (buttonName === "Timesheet") {
-      setShowTimesheet(true);
-      setShowEntries(false);
-    } else {
-      setShowTimesheet(false);
-    }
-
-    // Show entries view when Entries is selected
-    if (buttonName === "Entries") {
-      setShowEntries(true);
-      setShowTimesheet(false);
-    } else if (buttonName !== "Entries") {
-      setShowEntries(false);
-    }
-
-    // Reset translation state when switching away from Translation
-    if (buttonName !== "Translation") {
-      setTranslationResult(null);
-      setTextTranslationResult(null);
-      setPreviewText("");
-      setShowPreview(false);
-      setShowLanguageDropdown(false);
-    }
-  };
-
-  const handleLanguageSelect = (language) => {
-    setSelectedLanguage(language);
-    setShowLanguageDropdown(false);
-  };
-
-  const handleTranslateFiles = async () => {
-    if (selectedButton !== "Translation") {
-      const message = "Please select Translation option first";
-      toast ? toast.error(message) : alert(message);
-      return;
-    }
-
-    if (!selectedLanguage) {
-      const message = "Please select a target language";
-      toast ? toast.error(message) : alert(message);
-      return;
-    }
-
-    if (uploadedFiles.length === 0) {
-      const message = "Please upload files to translate";
-      toast ? toast.error(message) : alert(message);
-      return;
-    }
-
-    // For now, handle single file translation
-    const fileToTranslate = uploadedFiles[0];
+  if (previewFile && previewFileType === 'docx' && docxPreviewRef.current) {
+    // Clear previous content
+    docxPreviewRef.current.innerHTML = '';
     
-    setIsTranslating(true);
-    const translatingToast = toast ? toast.loading("Translating your document...") : null;
+    // Render DOCX preview
+    renderAsync(previewFile, docxPreviewRef.current, undefined, {
+      className: 'docx-wrapper',
+      inWrapper: true,
+      ignoreWidth: false,
+      ignoreHeight: false,
+      ignoreFonts: false,
+      breakPages: true,
+      ignoreLastRenderedPageBreak: true,
+      experimental: false,
+      trimXmlDeclaration: true,
+      useBase64URL: false,
+      renderChanges: false,
+      renderHeaders: true,
+      renderFooters: true,
+      renderFootnotes: true,
+      renderEndnotes: true,
+    }).catch(error => {
+      console.error('Error rendering DOCX:', error);
+      docxPreviewRef.current.innerHTML = '<p class="text-red-500 p-4">Error loading document preview</p>';
+    });
+  }
+}, [previewFile, previewFileType]);
 
-    try {
-      const result = await translationAPI.translate(fileToTranslate, selectedLanguage);
-      
-      if (toast) {
-        toast.update(translatingToast, {
-          render: "Translation completed successfully!",
-          type: "success",
-          isLoading: false,
-          autoClose: 3000,
-        });
-      } else {
-        alert("Translation completed successfully!");
-      }
+const onDocumentLoadSuccess = ({ numPages }) => {
+  setNumPages(numPages);
+  setPageNumber(1);
+};
 
-      setTranslationResult(result);
-      setPreviewText(result.preview || "");
-      setShowPreview(true);
+const goToPrevPage = () => {
+  setPageNumber(prev => Math.max(prev - 1, 1));
+};
 
-    } catch (error) {
-      console.error("Translation error:", error);
-      const errorMessage = `Translation failed: ${error.message}`;
-      
-      if (toast) {
-        toast.update(translatingToast, {
-          render: errorMessage,
-          type: "error",
-          isLoading: false,
-          autoClose: 5000,
-        });
-      } else {
-        alert(errorMessage);
-      }
-    } finally {
-      setIsTranslating(false);
-    }
-  };
-
-  const handleTranslateText = async () => {
-    if (!selectedLanguage) {
-      const message = "Please select a target language";
-      toast ? toast.error(message) : alert(message);
-      return;
-    }
-    
-    if (!query.trim()) {
-      const message = "Please enter text to translate";
-      toast ? toast.error(message) : alert(message);
-      return;
-    }
-    
-    setIsTranslating(true);
-    const translatingToast = toast ? toast.loading("Translating your text...") : null;
-    
-    try {
-      const result = await translationAPI.translateText(query, selectedLanguage);
-      
-      if (toast) {
-        toast.update(translatingToast, {
-          render: "Text translation completed successfully!",
-          type: "success",
-          isLoading: false,
-          autoClose: 3000,
-        });
-      } else {
-        alert("Text translation completed successfully!");
-      }
-      
-      setTextTranslationResult(result);
-    } catch (error) {
-      console.error("Text translation error:", error);
-      const errorMessage = `Translation failed: ${error.message}`;
-      
-      if (toast) {
-        toast.update(translatingToast, {
-          render: errorMessage,
-          type: "error",
-          isLoading: false,
-          autoClose: 5000,
-        });
-      } else {
-        alert(errorMessage);
-      }
-    } finally {
-      setIsTranslating(false);
-    }
-  };
-
-  const handleSubmit = async () => {
-    if (selectedButton === "Translation") {
-      if (uploadedFiles.length > 0) {
-        // Handle file translation
-        await handleTranslateFiles();
-      } else if (query.trim()) {
-        // Handle text translation
-        await handleTranslateText();
-      } else {
-        const message = "Please enter text to translate or upload a file";
-        toast ? toast.error(message) : alert(message);
-      }
-    } else if (query.trim()) {
-      // Handle other query types using original API logic
-      try {
-        const queryData = {
-          query: query.trim(),
-          selected_button: selectedButton,
-          selected_language: selectedLanguage,
-          uploaded_files: uploadedFiles,
-        };
-
-        console.log("Submitting query:", queryData);
-        const response = await queryAPI.search(queryData);
-
-        if (response.success) {
-          console.log("Query response:", response);
-          const message = `Query processed successfully! ${response.message}`;
-          toast ? toast.success(message) : alert(message);
-        } else {
-          console.error("Query failed:", response.message);
-          const message = `Query failed: ${response.message}`;
-          toast ? toast.error(message) : alert(message);
-        }
-      } catch (error) {
-        console.error("Query error:", error);
-        const message = `Query error: ${error.message}`;
-        toast ? toast.error(message) : alert(message);
-      }
-    }
-  };
-
-  const handleFileUpload = async (files) => {
-    const fileArray = Array.from(files);
-    
-    if (selectedButton === "Translation") {
-      // For translation, only allow specific file types
-      const validFiles = [];
-      const invalidFiles = [];
-
-      fileArray.forEach(file => {
-        const validTypes = [
-          "application/pdf",
-          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-          "application/vnd.openxmlformats-officedocument.presentationml.presentation"
-        ];
-        
-        const isValidType = validTypes.includes(file.type) || file.name.match(/\.(pdf|docx|pptx)$/i);
-
-        if (isValidType) {
-          const fileObj = {
-            id: Date.now() + Math.random(),
-            name: file.name,
-            size: file.size,
-            type: file.type,
-            file: file // Store the actual file object
-          };
-          validFiles.push(fileObj);
-        } else {
-          invalidFiles.push(file.name);
-        }
-      });
-
-      if (validFiles.length > 0) {
-        setUploadedFiles(prev => [...prev, ...validFiles]);
-        const message = `${validFiles.length} file(s) uploaded successfully`;
-        toast ? toast.success(message) : console.log(message);
-      }
-
-      if (invalidFiles.length > 0) {
-        const message = `Invalid files (only PDF, DOCX, PPTX allowed): ${invalidFiles.join(', ')}`;
-        toast ? toast.error(message) : alert(message);
-      }
-    } else {
-      // Original logic for other buttons
-      const validFiles = fileArray.filter((file) => {
-        const validTypes = [
-          "application/pdf",
-          "application/msword",
-          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-          "text/plain",
-          "application/vnd.ms-excel",
-          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        ];
-        return (
-          validTypes.includes(file.type) ||
-          file.name.match(/\.(pdf|doc|docx|txt|xls|xlsx)$/i)
-        );
-      });
-
-      // Upload files to backend
-      try {
-        const uploadPromises = validFiles.map((file) =>
-          queryAPI.uploadFile(file)
-        );
-        const uploadResults = await Promise.all(uploadPromises);
-
-        const successfulUploads = uploadResults
-          .filter((result) => result.success)
-          .map((result) => result.file);
-
-        setUploadedFiles((prev) => [...prev, ...successfulUploads]);
-
-        if (successfulUploads.length > 0) {
-          console.log(`Successfully uploaded ${successfulUploads.length} files`);
-        }
-
-        const failedUploads = uploadResults.filter((result) => !result.success);
-        if (failedUploads.length > 0) {
-          console.error("Some files failed to upload:", failedUploads);
-          const message = `${failedUploads.length} files failed to upload`;
-          toast ? toast.error(message) : alert(message);
-        }
-      } catch (error) {
-        console.error("File upload error:", error);
-        const message = `File upload failed: ${error.message}`;
-        toast ? toast.error(message) : alert(message);
-      }
-    }
-  };
-
-  const handleFileInputChange = (e) => {
-    handleFileUpload(e.target.files);
-  };
-
-  const handleDragOver = (e) => {
-    e.preventDefault();
-    setIsDragOver(true);
-  };
-
-  const handleDragLeave = (e) => {
-    e.preventDefault();
-    setIsDragOver(false);
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    setIsDragOver(false);
-    handleFileUpload(e.dataTransfer.files);
-  };
-
-  const removeFile = (fileId) => {
-    setUploadedFiles(prev => prev.filter(file => file.id !== fileId));
-    // Reset translation result if files are removed
-    if (translationResult) {
-      setTranslationResult(null);
-      setPreviewText("");
-      setShowPreview(false);
-    }
-  };
-
-  const handleDownload = async () => {
-    if (!translationResult?.file_id) {
-      const message = "No file available for download";
-      toast ? toast.error(message) : alert(message);
-      return;
-    }
-
-    const downloadToast = toast ? toast.loading("Preparing download...") : null;
-
-    try {
-      const response = await translationAPI.download(translationResult.file_id);
-      const blob = await response.blob();
-
-      // Get filename from Content-Disposition header or use default
-      const contentDisposition = response.headers.get('content-disposition');
-      let filename = 'translated_document';
-
-      // Extract file type or extension from Content-Type header or metadata if available
-      const contentType = response.headers.get('content-type');
-      let fileExtension = '';
-
-      if (contentType) {
-        if (contentType.includes('application/vnd.openxmlformats-officedocument.wordprocessingml.document')) {
-          fileExtension = '.docx';
-        } else if (contentType.includes('application/pdf')) {
-          fileExtension = '.pdf';
-        }
-      }
-
-      // If content-disposition includes filename, use it (and append the correct extension)
-      if (contentDisposition && contentDisposition.includes('filename=')) {
-        filename = contentDisposition
-          .split('filename=')[1]
-          .split(';')[0]
-          .replace(/"/g, '');
-      }
-
-      // Ensure filename has the correct extension
-      filename = filename.endsWith(fileExtension) ? filename : filename + fileExtension;
-
-      // Create download link
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.style.display = 'none';
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-
-      if (toast) {
-        toast.update(downloadToast, {
-          render: "File downloaded successfully!",
-          type: "success",
-          isLoading: false,
-          autoClose: 3000,
-        });
-      } else {
-        alert("File downloaded successfully!");
-      }
-
-    } catch (error) {
-      console.error("Download error:", error);
-      const errorMessage = `Download failed: ${error.message}`;
-      
-      if (toast) {
-        toast.update(downloadToast, {
-          render: errorMessage,
-          type: "error",
-          isLoading: false,
-          autoClose: 5000,
-        });
-      } else {
-        alert(errorMessage);
-      }
-    }
-  };
-
-  const formatFileSize = (bytes) => {
-    if (bytes === 0) return "0 Bytes";
-    const k = 1024;
-    const sizes = ["Bytes", "KB", "MB", "GB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
-  };
-
-  const getFileIcon = (fileName, fileType) => {
-    if (fileType === "application/pdf" || fileName.endsWith(".pdf")) {
-      return <FileText className="w-4 h-4 text-red-400" />;
-    }
-    if (fileType.includes("word") || fileName.match(/\.(doc|docx)$/i)) {
-      return <FileText className="w-4 h-4 text-blue-400" />;
-    }
-    if (fileType.includes("excel") || fileName.match(/\.(xls|xlsx)$/i)) {
-      return <FileText className="w-4 h-4 text-green-400" />;
-    }
-    if (fileType.includes("presentation") || fileName.match(/\.(ppt|pptx)$/i)) {
-      return <FileText className="w-4 h-4 text-orange-400" />;
-    }
-    return <File className="w-4 h-4 text-gray-400" />;
-  };
+const goToNextPage = () => {
+  setPageNumber(prev => Math.min(prev + 1, numPages));
+};
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-[#062e69] to-slate-800 flex relative overflow-hidden">
-      {toast && (
-        <ToastContainer
-          position="top-right"
-          autoClose={3000}
-          hideProgressBar={false}
-          newestOnTop={false}
-          closeOnClick
-          rtl={false}
-          pauseOnFocusLoss
-          draggable
-          pauseOnHover
-          theme="light"
-        />
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="light"
+      />
+
+      {/* Notification Permission Button */}
+      {notificationHelper.isSupported() && notificationPermission !== "granted" && (
+        <div className="fixed top-20 right-4 z-50">
+          <button
+            onClick={handleRequestNotificationPermission}
+            className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg transition-colors"
+            title="Enable notifications"
+          >
+            <Bell className="w-4 h-4" />
+            <span className="text-sm font-medium">Enable Notifications</span>
+          </button>
+        </div>
+      )}
+
+      {/* Notification Status Indicator */}
+      {notificationHelper.isSupported() && (
+        <div className="fixed bottom-4 left-4 z-50">
+          <div className={`flex items-center gap-2 px-3 py-2 rounded-lg shadow-md text-sm ${
+            notificationPermission === "granted" 
+              ? "bg-green-100 text-green-800" 
+              : notificationPermission === "denied"
+              ? "bg-red-100 text-red-800"
+              : "bg-gray-100 text-gray-800"
+          }`}>
+            {notificationPermission === "granted" ? (
+              <>
+                <Bell className="w-4 h-4" />
+                <span>Notifications enabled</span>
+              </>
+            ) : notificationPermission === "denied" ? (
+              <>
+                <BellOff className="w-4 h-4" />
+                <span>Notifications blocked</span>
+              </>
+            ) : (
+              <>
+                <Bell className="w-4 h-4" />
+                <span>Notifications disabled</span>
+              </>
+            )}
+          </div>
+        </div>
       )}
 
       {/* Animated background elements */}
@@ -862,9 +412,6 @@ const Home = ({ user, onBack, onLogout }) => {
                   <button
                     onClick={() => {
                       setUploadedFiles([]);
-                      setTranslationResult(null);
-                      setPreviewText("");
-                      setShowPreview(false);
                     }}
                     className="text-[#062e69]/70 hover:text-[#062e69] text-sm transition-colors duration-200 font-medium"
                   >
@@ -1004,7 +551,6 @@ const Home = ({ user, onBack, onLogout }) => {
               <TimesheetForm
                 onClose={() => {
                   setShowTimesheet(false);
-                  setSelectedButton(null);
                 }}
               />
             </div>
@@ -1016,7 +562,6 @@ const Home = ({ user, onBack, onLogout }) => {
               <TimesheetEntries
                 onClose={() => {
                   setShowEntries(false);
-                  setSelectedButton(null);
                 }}
               />
             </div>
@@ -1026,57 +571,113 @@ const Home = ({ user, onBack, onLogout }) => {
 
       {/* Preview Panel */}
       {showPreview && (
-        <div className="w-1/2 p-4 bg-white/5 backdrop-blur-sm border-l border-white/10 animate-slide-in-right">
-          <div className="h-full bg-white/95 backdrop-blur-xl border border-[#062e69]/30 rounded-2xl shadow-lg flex flex-col">
-            {/* Preview Header */}
-            <div className="flex items-center justify-between p-4 border-b border-[#062e69]/10">
-              <div className="flex items-center space-x-2">
-                <Eye className="w-5 h-5 text-[#062e69]" />
-                <h3 className="text-lg font-semibold text-[#062e69]">
-                  Translation Preview
-                </h3>
-                <p className="pl-5 text-lg">Accuracy: {percentage}%</p>
+  <div className="w-1/2 p-2 bg-white/5 backdrop-blur-sm border-l border-white/10 animate-slide-in-right">
+    <div className="h-full bg-white/95 backdrop-blur-xl border border-[#062e69]/30 rounded-2xl shadow-lg flex flex-col overflow-y-auto max-h-screen">
+      {/* Preview Header */}
+      <div className="flex items-center justify-between p-4 border-b border-[#062e69]/10">
+        <div className="flex items-center space-x-2">
+          <Eye className="w-5 h-5 text-[#062e69]" />
+          <h3 className="text-lg font-semibold text-[#062e69]">
+            Translation Preview
+          </h3>
+          <p className="pl-5 text-lg">Accuracy: {percentage}%</p>
+        </div>
+        <button
+          onClick={() => {
+            setShowPreview(false);
+            setPageNumber(1);
+          }}
+          className="p-1 text-[#062e69]/60 hover:text-[#062e69] transition-colors rounded-lg hover:bg-[#062e69]/10"
+        >
+          <X className="w-5 h-5" />
+        </button>
+      </div>
+
+      {/* Preview Content */}
+      <div className="flex-1 p-4 overflow-y-auto">
+        {previewFile && previewFileType === 'pdf' ? (
+          <div className="flex flex-col items-center">
+            <Document
+              file={previewFile}
+              onLoadSuccess={onDocumentLoadSuccess}
+              loading={
+                <div className="flex items-center justify-center p-8">
+                  <Loader2 className="w-8 h-8 animate-spin text-[#062e69]" />
+                </div>
+              }
+              error={
+                <div className="text-red-500 p-4 text-center">
+                  Error loading PDF. Please try downloading the file.
+                </div>
+              }
+            >
+              <Page
+                pageNumber={pageNumber}
+                renderTextLayer={true}
+                renderAnnotationLayer={true}
+                className="shadow-lg"
+                width={Math.min(window.innerWidth * 0.4, 800)}
+              />
+            </Document>
+            
+            {numPages && numPages > 1 && (
+              <div className="mt-4 flex items-center gap-4 bg-[#062e69]/10 px-4 py-2 rounded-lg">
+                <button
+                  onClick={goToPrevPage}
+                  disabled={pageNumber <= 1}
+                  className="px-3 py-1 bg-[#062e69] text-white rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+                <span className="text-[#062e69] font-medium">
+                  Page {pageNumber} of {numPages}
+                </span>
+                <button
+                  onClick={goToNextPage}
+                  disabled={pageNumber >= numPages}
+                  className="px-3 py-1 bg-[#062e69] text-white rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
               </div>
-              <button
-                onClick={() => setShowPreview(false)}
-                className="p-1 text-[#062e69]/60 hover:text-[#062e69] transition-colors rounded-lg hover:bg-[#062e69]/10"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Preview Content */}
-            <div className="flex-1 p-4 overflow-y-auto">
-              {previewText ? (
-                <div className="prose prose-sm max-w-none">
-                  <pre className="whitespace-pre-wrap text-[#062e69] font-sans text-sm leading-relaxed">
-                    {previewText}
-                  </pre>
-                </div>
-              ) : (
-                <div className="flex items-center justify-center h-full text-[#062e69]/60">
-                  <div className="text-center">
-                    <FileText className="w-12 h-12 mx-auto mb-2 opacity-40" />
-                    <p className="text-sm">No preview available</p>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Download Button */}
-            <div className="p-4 border-t border-[#062e69]/10">
-              <button
-                onClick={handleDownload}
-                disabled={!translationResult?.file_id}
-                className="w-full bg-gradient-to-r from-[#062e69] to-[#062e69]/80 hover:from-[#062e69]/90 hover:to-[#062e69] text-white px-4 py-3 rounded-xl font-medium transition-all duration-200 transform hover:scale-105 hover:shadow-lg hover:shadow-[#062e69]/25 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-              >
-                <Download className="w-4 h-4" />
-                <span>Download Translated File</span>
-              </button>
+            )}
+          </div>
+        ) : previewFile && previewFileType === 'docx' ? (
+          <div 
+            ref={docxPreviewRef}
+            className="docx-preview-container bg-white p-4 rounded-lg shadow-inner"
+            style={{
+              minHeight: '500px',
+              maxWidth: '100%',
+              overflow: 'auto'
+            }}
+          />
+        ) : (
+          <div className="flex items-center justify-center h-full text-[#062e69]/60">
+            <div className="text-center">
+              <FileText className="w-12 h-12 mx-auto mb-2 opacity-40" />
+              <p className="text-sm">
+                {translationResult ? 'Preview not available for this file type' : 'No preview available'}
+              </p>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
+
+      {/* Download Button */}
+      <div className="p-4 border-t border-[#062e69]/10">
+        <button
+          onClick={handleDownload}
+          disabled={!translationResult?.file_id}
+          className="w-full bg-gradient-to-r from-[#062e69] to-[#062e69]/80 hover:from-[#062e69]/90 hover:to-[#062e69] text-white px-4 py-3 rounded-xl font-medium transition-all duration-200 transform hover:scale-105 hover:shadow-lg hover:shadow-[#062e69]/25 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+        >
+          <Download className="w-4 h-4" />
+          <span>Download Translated File</span>
+        </button>
+      </div>
+    </div>
+  </div>
+)}
     </div>
   );
 };

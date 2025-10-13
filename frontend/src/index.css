@@ -177,3 +177,36 @@ button {
 .delay-400 {
   animation-delay: 400ms;
 }
+
+.docx-preview-container {
+  font-family: 'Calibri', 'Arial', sans-serif;
+}
+
+.docx-wrapper {
+  background: white;
+  padding: 40px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.1);
+}
+
+.docx-wrapper section.docx {
+  margin-bottom: 20px;
+  background: white;
+  padding: 20px;
+}
+
+.docx-wrapper p {
+  margin-bottom: 10px;
+  line-height: 1.6;
+}
+
+.docx-wrapper table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 10px 0;
+}
+
+.docx-wrapper table td,
+.docx-wrapper table th {
+  border: 1px solid #ddd;
+  padding: 8px;
+}
