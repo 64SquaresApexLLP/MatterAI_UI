@@ -365,7 +365,10 @@ const Home = ({ user, onBack, onLogout }) => {
                   type="text"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Case related questions or Translate something here..."
+                  // placeholder="Case related questions or Translate something here..."
+                  placeholder={selectedButton === "Translation" 
+                  ? "Enter translation instructions (e.g., 'Translate to Spanish') or select language..." 
+                  : "Case related questions..."}
                   className="flex-1 bg-transparent text-[#062e69] placeholder-[#062e69]/50 focus:outline-none text-lg font-medium"
                 />
 
@@ -385,7 +388,7 @@ const Home = ({ user, onBack, onLogout }) => {
                         </span>
                       )}
                       {!selectedLanguage && (
-                        <span className="text-sm text-[#062e69]/50">Select</span>
+                        <span className="text-sm text-[#062e69]/50">Select (Optional)</span>
                       )}
                     </button>
 
@@ -458,7 +461,6 @@ const Home = ({ user, onBack, onLogout }) => {
                   ) : selectedButton === "Translation" ? (
                     <>
                       <span>Translate</span>
-                      <Languages className="w-4 h-4" />
                     </>
                   ) : (
                     <>
@@ -468,7 +470,6 @@ const Home = ({ user, onBack, onLogout }) => {
                   )}
                 </button>
               </div>
-
               {isDragOver && (
                 <div className="absolute inset-0 bg-[#062e69]/10 backdrop-blur-sm rounded-2xl border-2 border-dashed border-[#062e69]/50 flex items-center justify-center z-10">
                   <div className="text-[#062e69] font-medium flex items-center space-x-2">
@@ -479,6 +480,12 @@ const Home = ({ user, onBack, onLogout }) => {
               )}
             </div>
           </div>
+
+          {selectedButton === "Translation" && (
+          <div className="mb-2 text-xs text-[#062e69]/60 text-center bg-white/80 rounded-lg p-2">
+          💡 <strong>Tip:</strong> Select a language from the dropdown OR include it in your prompt (e.g., "Translate to German")
+          </div>
+          )}
 
           {isListening && (
             <div className="flex justify-center mt-2 space-x-1 mb-4">
@@ -756,6 +763,13 @@ const Home = ({ user, onBack, onLogout }) => {
             {/* Preview Header */}
             <div className="flex items-center justify-between p-4 border-b border-[#062e69]/10">
               <div className="flex items-center space-x-2">
+                <button
+                onClick={handleClosePreview}
+                className="p-1 text-[#062e69]/60 hover:text-red-500 transition-colors rounded-lg hover:bg-red-50"
+                title="Close Preview"
+              >
+                <X className="w-4 h-4" />
+              </button>
                 <Eye className="w-5 h-5 text-[#062e69]" />
                 <h3 className="text-lg font-semibold text-[#062e69]">
                   Translation Preview

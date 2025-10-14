@@ -22,11 +22,11 @@ const LANGUAGE_MAPPING = {
 };
 
 export const translationAPI = {
-  translateFileConvo: async (files, targetLanguage) => {
+  translateFileConvoWithPrompt: async (files, prompt) => {
     console.log('=== Translation File Convo Request Debug ===');
     console.log('Files:', files);
     console.log('Files count:', files.length);
-    console.log('Target language:', targetLanguage);
+    console.log('Prompt:', prompt);
 
     const formData = new FormData();
     
@@ -36,9 +36,8 @@ export const translationAPI = {
       formData.append('files', file.file);
     });
     
-    const backendLanguage = LANGUAGE_MAPPING[targetLanguage] || targetLanguage.toLowerCase();
-    console.log('Backend language:', backendLanguage);
-    formData.append('prompt', `Translate to ${backendLanguage}`);
+    // Use the prompt directly as provided
+    formData.append('prompt', prompt);
 
     const response = await fetch(`${TRANSLATION_API_BASE_URL}/translate_file_convo`, {
       method: 'POST',
@@ -52,6 +51,11 @@ export const translationAPI = {
 
     const data = await response.json();
     return data;
+  },
+
+  translateFileConvo: async (files, targetLanguage) => {
+    const backendLanguage = LANGUAGE_MAPPING[targetLanguage] || targetLanguage.toLowerCase();
+    return translationAPI.translateFileConvoWithPrompt(files, `Translate to ${backendLanguage}`);
   },
 
   checkStatus: async (jobId) => {
@@ -417,11 +421,12 @@ export const useHomeLogic = () => {
     return;
   }
 
-  // if (!selectedLanguage) {
-  //   const message = "Please select a target language";
-  //   toast ? toast.error(message) : alert(message);
-  //   return;
-  // }
+  // NEW VALIDATION: Check if either language is selected OR query has text
+  if (!selectedLanguage && !query.trim()) {
+    const message = "Please either select a target language or enter a prompt with the target language";
+    toast ? toast.error(message) : alert(message);
+    return;
+  }
 
   if (uploadedFiles.length === 0) {
     const message = "Please upload files to translate";
@@ -433,8 +438,26 @@ export const useHomeLogic = () => {
   const translatingToast = toast ? toast.loading(`Translating ${uploadedFiles.length} file(s)...`) : null;
 
   try {
-    // This will now send all files + prompt directly to /translate_file_convo
-    const result = await translationAPI.translateFileConvo(uploadedFiles, selectedLanguage);
+    // NEW: Build prompt based on what's available
+    let translationPrompt;
+    if (selectedLanguage) {
+      // If language is selected, use it in the prompt
+      const backendLanguage = LANGUAGE_MAPPING[selectedLanguage] || selectedLanguage.toLowerCase();
+      translationPrompt = `Translate to ${backendLanguage}`;
+      
+      // If there's also query text, append it
+      if (query.trim()) {
+        translationPrompt += `. ${query.trim()}`;
+      }
+    } else {
+      // If no language selected, use the query as the full prompt
+      translationPrompt = query.trim();
+    }
+
+    console.log('Translation prompt:', translationPrompt);
+
+    // Call the updated API function with the dynamic prompt
+    const result = await translationAPI.translateFileConvoWithPrompt(uploadedFiles, translationPrompt);
     
     if (toast) {
       toast.update(translatingToast, {
@@ -477,22 +500,25 @@ export const useHomeLogic = () => {
 };
 
   const handleTranslateText = async () => {
-    if (!selectedLanguage) {
-      const message = "Please select a target language";
-      toast ? toast.error(message) : alert(message);
-      return;
-    }
-    
-    if (!query.trim()) {
-      const message = "Please enter text to translate";
-      toast ? toast.error(message) : alert(message);
-      return;
-    }
-    
-    setIsTranslating(true);
-    const translatingToast = toast ? toast.loading("Translating your text...") : null;
-    
-    try {
+  // NEW VALIDATION: Either language selected or query contains language instruction
+  if (!selectedLanguage && !query.trim()) {
+    const message = "Please either select a target language or specify it in your text";
+    toast ? toast.error(message) : alert(message);
+    return;
+  }
+  
+  if (!query.trim()) {
+    const message = "Please enter text to translate";
+    toast ? toast.error(message) : alert(message);
+    return;
+  }
+  
+  setIsTranslating(true);
+  const translatingToast = toast ? toast.loading("Translating your text...") : null;
+  
+  try {
+    // If language is selected, use it; otherwise rely on query to contain language
+    if (selectedLanguage) {
       const result = await translationAPI.translateText(query, selectedLanguage);
       
       if (toast) {
@@ -507,63 +533,90 @@ export const useHomeLogic = () => {
       }
       
       setTextTranslationResult(result);
-    } catch (error) {
-      console.error("Text translation error:", error);
-      const errorMessage = `Translation failed: ${error.message}`;
-      
-      if (toast) {
-        toast.update(translatingToast, {
-          render: errorMessage,
-          type: "error",
-          isLoading: false,
-          autoClose: 5000,
-        });
-      } else {
-        alert(errorMessage);
-      }
-    } finally {
+    } else {
+      // For prompt-based text translation, you might need a different endpoint
+      // or handle it differently. For now, show a helpful message
+      const message = "For text translation without language selection, please use the file translation option";
+      toast ? toast.info(message) : alert(message);
       setIsTranslating(false);
+      return;
     }
-  };
+  } catch (error) {
+    console.error("Text translation error:", error);
+    const errorMessage = `Translation failed: ${error.message}`;
+    
+    if (toast) {
+      toast.update(translatingToast, {
+        render: errorMessage,
+        type: "error",
+        isLoading: false,
+        autoClose: 5000,
+      });
+    } else {
+      alert(errorMessage);
+    }
+  } finally {
+    setIsTranslating(false);
+  }
+};
 
   const handleSubmit = async () => {
-    if (selectedButton === "Translation") {
-      if (uploadedFiles.length > 0) {
-        await handleTranslateFiles();
-      } else if (query.trim()) {
-        await handleTranslateText();
-      } else {
-        const message = "Please enter text to translate or upload a file";
-        toast ? toast.error(message) : alert(message);
-      }
-    } else if (query.trim()) {
-      try {
-        const queryData = {
-          query: query.trim(),
-          selected_button: selectedButton,
-          selected_language: selectedLanguage,
-          uploaded_files: uploadedFiles,
-        };
-
-        console.log("Submitting query:", queryData);
-        const response = await queryAPI.search(queryData);
-
-        if (response.success) {
-          console.log("Query response:", response);
-          const message = `Query processed successfully! ${response.message}`;
-          toast ? toast.success(message) : alert(message);
-        } else {
-          console.error("Query failed:", response.message);
-          const message = `Query failed: ${response.message}`;
-          toast ? toast.error(message) : alert(message);
-        }
-      } catch (error) {
-        console.error("Query error:", error);
-        const message = `Query error: ${error.message}`;
-        toast ? toast.error(message) : alert(message);
-      }
+  if (selectedButton === "Translation") {
+    // NEW VALIDATION: Check for either files or text, and either language or prompt
+    if (uploadedFiles.length === 0 && !query.trim()) {
+      const message = "Please enter text to translate or upload files";
+      toast ? toast.error(message) : alert(message);
+      return;
     }
-  };
+
+    if (!selectedLanguage && !query.trim()) {
+      const message = "Please either select a language or include translation instructions in your prompt";
+      toast ? toast.error(message) : alert(message);
+      return;
+    }
+
+    // If files are uploaded, do file translation
+    if (uploadedFiles.length > 0) {
+      await handleTranslateFiles();
+    } 
+    // If only text, do text translation (requires language selection)
+    else if (query.trim()) {
+      if (!selectedLanguage) {
+        const message = "For text-only translation, please select a target language";
+        toast ? toast.error(message) : alert(message);
+        return;
+      }
+      await handleTranslateText();
+    }
+  } else if (query.trim()) {
+    // ... rest of the non-translation logic remains the same
+    try {
+      const queryData = {
+        query: query.trim(),
+        selected_button: selectedButton,
+        selected_language: selectedLanguage,
+        uploaded_files: uploadedFiles,
+      };
+
+      console.log("Submitting query:", queryData);
+      const response = await queryAPI.search(queryData);
+
+      if (response.success) {
+        console.log("Query response:", response);
+        const message = `Query processed successfully! ${response.message}`;
+        toast ? toast.success(message) : alert(message);
+      } else {
+        console.error("Query failed:", response.message);
+        const message = `Query failed: ${response.message}`;
+        toast ? toast.error(message) : alert(message);
+      }
+    } catch (error) {
+      console.error("Query error:", error);
+      const message = `Query error: ${error.message}`;
+      toast ? toast.error(message) : alert(message);
+    }
+  }
+};
 
 const handleFileUpload = async (files) => {
   const fileArray = Array.from(files);
