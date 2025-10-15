@@ -21,6 +21,39 @@ const LANGUAGE_MAPPING = {
   "Dutch": "dutch"
 };
 
+// Helper function to extract languages from prompt
+const extractLanguagesFromPrompt = (prompt) => {
+  const lowerPrompt = prompt.toLowerCase();
+  
+  // Pattern 1: "Translate to German, French, and Spanish"
+  // Pattern 2: "Translate to German and French"
+  // Pattern 3: "German, French, Spanish"
+  
+  const languages = [];
+  
+  // Check each language in mapping
+  Object.keys(LANGUAGE_MAPPING).forEach(lang => {
+    if (lowerPrompt.includes(lang.toLowerCase())) {
+      languages.push(lang);
+    }
+  });
+  
+  // Also check for backend language names
+  Object.values(LANGUAGE_MAPPING).forEach(lang => {
+    if (lowerPrompt.includes(lang) && !languages.find(l => LANGUAGE_MAPPING[l] === lang)) {
+      // Find the display name for this backend language
+      const displayName = Object.keys(LANGUAGE_MAPPING).find(
+        key => LANGUAGE_MAPPING[key] === lang
+      );
+      if (displayName && !languages.includes(displayName)) {
+        languages.push(displayName);
+      }
+    }
+  });
+  
+  return languages;
+};
+
 export const translationAPI = {
   translateFileConvoWithPrompt: async (files, prompt) => {
     console.log('=== Translation File Convo Request Debug ===');
@@ -58,8 +91,81 @@ export const translationAPI = {
     return translationAPI.translateFileConvoWithPrompt(files, `Translate to ${backendLanguage}`);
   },
 
+  // NEW: Translate single file to multiple languages
+  translateFileToMultipleLanguages: async (file, promptOrLanguages) => {
+    console.log('=== Multi-Language Translation Request ===');
+    console.log('File:', file.name);
+    console.log('Prompt/Languages:', promptOrLanguages);
+
+    let languages = [];
+    
+    // Check if it's an array of languages or a prompt string
+    if (Array.isArray(promptOrLanguages)) {
+      languages = promptOrLanguages;
+    } else if (typeof promptOrLanguages === 'string') {
+      languages = extractLanguagesFromPrompt(promptOrLanguages);
+    }
+
+    if (languages.length === 0) {
+      throw new Error("No valid languages found. Please specify languages like 'Translate to German, French, Spanish'");
+    }
+
+    console.log('Extracted languages:', languages);
+
+    // Make separate API calls for each language
+    const allJobs = [];
+    const results = [];
+
+    for (const language of languages) {
+      try {
+        const backendLanguage = LANGUAGE_MAPPING[language] || language.toLowerCase();
+        console.log(`Translating to ${language} (${backendLanguage})...`);
+        
+        const result = await translationAPI.translateFileConvoWithPrompt(
+          [file], 
+          `Translate to ${backendLanguage}`
+        );
+        
+        results.push({
+          language,
+          success: true,
+          jobs: result.jobs || []
+        });
+        
+        allJobs.push(...(result.jobs || []));
+      } catch (error) {
+        console.error(`Failed to translate to ${language}:`, error);
+        results.push({
+          language,
+          success: false,
+          error: error.message
+        });
+      }
+    }
+
+    return {
+      response: `Translation started for ${languages.length} language(s): ${languages.join(', ')}`,
+      jobs: allJobs,
+      results,
+      languagesCount: languages.length
+    };
+  },
+
   checkStatus: async (jobId) => {
     const response = await fetch(`${TRANSLATION_API_BASE_URL}/status/${jobId}`, {
+      method: 'GET',
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+      throw new Error(errorData.detail || `HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    return await response.json();
+  },
+
+  getEvaluation: async (evaluationId) => {
+    const response = await fetch(`${TRANSLATION_API_BASE_URL}/evaluation/${evaluationId}`, {
       method: 'GET',
     });
 
@@ -210,6 +316,7 @@ export const useHomeLogic = () => {
   const [translationResult, setTranslationResult] = useState(null);
   const [translationJobs, setTranslationJobs] = useState([]);
   const [jobStatuses, setJobStatuses] = useState({});
+  const [evaluationData, setEvaluationData] = useState({});
   const [previewText, setPreviewText] = useState("");
   const [showPreview, setShowPreview] = useState(false);
   const fileInputRef = useRef(null);
@@ -269,6 +376,24 @@ export const useHomeLogic = () => {
     }
   }, []);
 
+  // Fetch evaluation data
+  const fetchEvaluation = async (evaluationId, jobId) => {
+    try {
+      const evaluation = await translationAPI.getEvaluation(evaluationId);
+      setEvaluationData(prev => ({
+        ...prev,
+        [jobId]: evaluation
+      }));
+      return evaluation;
+    } catch (error) {
+      console.error(`Evaluation fetch error for ${evaluationId}:`, error);
+      setEvaluationData(prev => ({
+        ...prev,
+        [jobId]: { error: error.message }
+      }));
+    }
+  };
+
   // Poll job status
   const pollJobStatus = async (jobId, filename) => {
     const maxAttempts = 60; // 5 minutes with 5-second intervals
@@ -285,6 +410,11 @@ export const useHomeLogic = () => {
         }));
 
         if (status.status === 'COMPLETED') {
+          // Fetch evaluation data if available
+          if (status.evaluation_id) {
+            await fetchEvaluation(status.evaluation_id, jobId);
+          }
+
           // Show completion notification
           notificationHelper.show(
             'Translation Complete', 
@@ -400,6 +530,7 @@ export const useHomeLogic = () => {
       setTranslationResult(null);
       setTranslationJobs([]);
       setJobStatuses({});
+      setEvaluationData({});
       setTextTranslationResult(null);
       setPreviewText("");
       setPreviewFile(null);
@@ -415,339 +546,359 @@ export const useHomeLogic = () => {
   };
 
   const handleTranslateFiles = async () => {
-  if (selectedButton !== "Translation") {
-    const message = "Please select Translation option first";
-    toast ? toast.error(message) : alert(message);
-    return;
-  }
+    if (selectedButton !== "Translation") {
+      const message = "Please select Translation option first";
+      toast ? toast.error(message) : alert(message);
+      return;
+    }
 
-  // NEW VALIDATION: Check if either language is selected OR query has text
-  if (!selectedLanguage && !query.trim()) {
-    const message = "Please either select a target language or enter a prompt with the target language";
-    toast ? toast.error(message) : alert(message);
-    return;
-  }
+    // Validation: Check if either language is selected OR query has text
+    if (!selectedLanguage && !query.trim()) {
+      const message = "Please either select a target language or enter a prompt with the target language";
+      toast ? toast.error(message) : alert(message);
+      return;
+    }
 
-  if (uploadedFiles.length === 0) {
-    const message = "Please upload files to translate";
-    toast ? toast.error(message) : alert(message);
-    return;
-  }
+    if (uploadedFiles.length === 0) {
+      const message = "Please upload files to translate";
+      toast ? toast.error(message) : alert(message);
+      return;
+    }
 
-  setIsTranslating(true);
-  const translatingToast = toast ? toast.loading(`Translating ${uploadedFiles.length} file(s)...`) : null;
+    setIsTranslating(true);
+    const translatingToast = toast ? toast.loading(`Translating ${uploadedFiles.length} file(s)...`) : null;
 
-  try {
-    // NEW: Build prompt based on what's available
-    let translationPrompt;
-    if (selectedLanguage) {
-      // If language is selected, use it in the prompt
-      const backendLanguage = LANGUAGE_MAPPING[selectedLanguage] || selectedLanguage.toLowerCase();
-      translationPrompt = `Translate to ${backendLanguage}`;
-      
-      // If there's also query text, append it
-      if (query.trim()) {
-        translationPrompt += `. ${query.trim()}`;
+    try {
+      let result;
+
+      // NEW LOGIC: Check if single file + multiple languages in prompt
+      const extractedLanguages = query.trim() ? extractLanguagesFromPrompt(query) : [];
+      const isSingleFileMultiLanguage = uploadedFiles.length === 1 && extractedLanguages.length > 1;
+
+      if (isSingleFileMultiLanguage) {
+        // Single file, multiple languages
+        console.log('=== Single File Multi-Language Translation ===');
+        console.log('File:', uploadedFiles[0].name);
+        console.log('Languages:', extractedLanguages);
+
+        result = await translationAPI.translateFileToMultipleLanguages(
+          uploadedFiles[0],
+          query.trim()
+        );
+
+      } else {
+        // Original logic: multiple files or single language
+        let translationPrompt;
+        if (selectedLanguage) {
+          const backendLanguage = LANGUAGE_MAPPING[selectedLanguage] || selectedLanguage.toLowerCase();
+          translationPrompt = `Translate to ${backendLanguage}`;
+          
+          if (query.trim()) {
+            translationPrompt += `. ${query.trim()}`;
+          }
+        } else {
+          translationPrompt = query.trim();
+        }
+
+        console.log('=== Standard Translation Request ===');
+        console.log('Translation prompt:', translationPrompt);
+        console.log('Number of files:', uploadedFiles.length);
+
+        result = await translationAPI.translateFileConvoWithPrompt(uploadedFiles, translationPrompt);
       }
-    } else {
-      // If no language selected, use the query as the full prompt
-      translationPrompt = query.trim();
-    }
-
-    console.log('Translation prompt:', translationPrompt);
-
-    // Call the updated API function with the dynamic prompt
-    const result = await translationAPI.translateFileConvoWithPrompt(uploadedFiles, translationPrompt);
-    
-    if (toast) {
-      toast.update(translatingToast, {
-        render: result.response,
-        type: "success",
-        isLoading: false,
-        autoClose: 5000,
-      });
-    } else {
-      alert(result.response);
-    }
-
-    setTranslationResult(result);
-    setTranslationJobs(result.jobs);
-    
-    // Start polling for each job
-    result.jobs.forEach(job => {
-      pollJobStatus(job.job_id, job.filename);
-    });
-
-    setShowPreview(true);
-
-  } catch (error) {
-    console.error("Translation error:", error);
-    const errorMessage = `Translation failed: ${error.message}`;
-    
-    if (toast) {
-      toast.update(translatingToast, {
-        render: errorMessage,
-        type: "error",
-        isLoading: false,
-        autoClose: 5000,
-      });
-    } else {
-      alert(errorMessage);
-    }
-  } finally {
-    setIsTranslating(false);
-  }
-};
-
-  const handleTranslateText = async () => {
-  // NEW VALIDATION: Either language selected or query contains language instruction
-  if (!selectedLanguage && !query.trim()) {
-    const message = "Please either select a target language or specify it in your text";
-    toast ? toast.error(message) : alert(message);
-    return;
-  }
-  
-  if (!query.trim()) {
-    const message = "Please enter text to translate";
-    toast ? toast.error(message) : alert(message);
-    return;
-  }
-  
-  setIsTranslating(true);
-  const translatingToast = toast ? toast.loading("Translating your text...") : null;
-  
-  try {
-    // If language is selected, use it; otherwise rely on query to contain language
-    if (selectedLanguage) {
-      const result = await translationAPI.translateText(query, selectedLanguage);
+      
+      console.log('=== Translation Response ===');
+      console.log('Response:', result.response);
+      console.log('Number of jobs created:', result.jobs?.length || 0);
+      console.log('Jobs:', result.jobs);
       
       if (toast) {
         toast.update(translatingToast, {
-          render: "Text translation completed successfully!",
+          render: result.response,
           type: "success",
           isLoading: false,
-          autoClose: 3000,
+          autoClose: 5000,
         });
       } else {
-        alert("Text translation completed successfully!");
+        alert(result.response);
       }
+
+      setTranslationResult(result);
+      setTranslationJobs(result.jobs || []);
       
-      setTextTranslationResult(result);
-    } else {
-      // For prompt-based text translation, you might need a different endpoint
-      // or handle it differently. For now, show a helpful message
-      const message = "For text translation without language selection, please use the file translation option";
-      toast ? toast.info(message) : alert(message);
+      // Start polling for each job
+      if (result.jobs && result.jobs.length > 0) {
+        result.jobs.forEach(job => {
+          console.log(`Starting polling for job: ${job.job_id}, File: ${job.filename}, Language: ${job.target_language}`);
+          pollJobStatus(job.job_id, job.filename);
+        });
+      } else {
+        console.warn('No jobs returned from translation API');
+      }
+
+      setShowPreview(true);
+
+    } catch (error) {
+      console.error("Translation error:", error);
+      const errorMessage = `Translation failed: ${error.message}`;
+      
+      if (toast) {
+        toast.update(translatingToast, {
+          render: errorMessage,
+          type: "error",
+          isLoading: false,
+          autoClose: 5000,
+        });
+      } else {
+        alert(errorMessage);
+      }
+    } finally {
       setIsTranslating(false);
+    }
+  };
+
+  const handleTranslateText = async () => {
+    // Validation: Either language selected or query contains language instruction
+    if (!selectedLanguage && !query.trim()) {
+      const message = "Please either select a target language or specify it in your text";
+      toast ? toast.error(message) : alert(message);
       return;
     }
-  } catch (error) {
-    console.error("Text translation error:", error);
-    const errorMessage = `Translation failed: ${error.message}`;
     
-    if (toast) {
-      toast.update(translatingToast, {
-        render: errorMessage,
-        type: "error",
-        isLoading: false,
-        autoClose: 5000,
-      });
-    } else {
-      alert(errorMessage);
+    if (!query.trim()) {
+      const message = "Please enter text to translate";
+      toast ? toast.error(message) : alert(message);
+      return;
     }
-  } finally {
-    setIsTranslating(false);
-  }
-};
+    
+    setIsTranslating(true);
+    const translatingToast = toast ? toast.loading("Translating your text...") : null;
+    
+    try {
+      if (selectedLanguage) {
+        const result = await translationAPI.translateText(query, selectedLanguage);
+        
+        if (toast) {
+          toast.update(translatingToast, {
+            render: "Text translation completed successfully!",
+            type: "success",
+            isLoading: false,
+            autoClose: 3000,
+          });
+        } else {
+          alert("Text translation completed successfully!");
+        }
+        
+        setTextTranslationResult(result);
+      } else {
+        const message = "For text translation without language selection, please use the file translation option";
+        toast ? toast.info(message) : alert(message);
+        setIsTranslating(false);
+        return;
+      }
+    } catch (error) {
+      console.error("Text translation error:", error);
+      const errorMessage = `Translation failed: ${error.message}`;
+      
+      if (toast) {
+        toast.update(translatingToast, {
+          render: errorMessage,
+          type: "error",
+          isLoading: false,
+          autoClose: 5000,
+        });
+      } else {
+        alert(errorMessage);
+      }
+    } finally {
+      setIsTranslating(false);
+    }
+  };
 
   const handleSubmit = async () => {
-  if (selectedButton === "Translation") {
-    // NEW VALIDATION: Check for either files or text, and either language or prompt
-    if (uploadedFiles.length === 0 && !query.trim()) {
-      const message = "Please enter text to translate or upload files";
-      toast ? toast.error(message) : alert(message);
-      return;
-    }
-
-    if (!selectedLanguage && !query.trim()) {
-      const message = "Please either select a language or include translation instructions in your prompt";
-      toast ? toast.error(message) : alert(message);
-      return;
-    }
-
-    // If files are uploaded, do file translation
-    if (uploadedFiles.length > 0) {
-      await handleTranslateFiles();
-    } 
-    // If only text, do text translation (requires language selection)
-    else if (query.trim()) {
-      if (!selectedLanguage) {
-        const message = "For text-only translation, please select a target language";
+    if (selectedButton === "Translation") {
+      // Validation: Check for either files or text, and either language or prompt
+      if (uploadedFiles.length === 0 && !query.trim()) {
+        const message = "Please enter text to translate or upload files";
         toast ? toast.error(message) : alert(message);
         return;
       }
-      await handleTranslateText();
-    }
-  } else if (query.trim()) {
-    // ... rest of the non-translation logic remains the same
-    try {
-      const queryData = {
-        query: query.trim(),
-        selected_button: selectedButton,
-        selected_language: selectedLanguage,
-        uploaded_files: uploadedFiles,
-      };
 
-      console.log("Submitting query:", queryData);
-      const response = await queryAPI.search(queryData);
+      if (!selectedLanguage && !query.trim()) {
+        const message = "Please either select a language or include translation instructions in your prompt";
+        toast ? toast.error(message) : alert(message);
+        return;
+      }
 
-      if (response.success) {
-        console.log("Query response:", response);
-        const message = `Query processed successfully! ${response.message}`;
-        toast ? toast.success(message) : alert(message);
-      } else {
-        console.error("Query failed:", response.message);
-        const message = `Query failed: ${response.message}`;
+      // If files are uploaded, do file translation
+      if (uploadedFiles.length > 0) {
+        await handleTranslateFiles();
+      } 
+      // If only text, do text translation (requires language selection)
+      else if (query.trim()) {
+        if (!selectedLanguage) {
+          const message = "For text-only translation, please select a target language";
+          toast ? toast.error(message) : alert(message);
+          return;
+        }
+        await handleTranslateText();
+      }
+    } else if (query.trim()) {
+      try {
+        const queryData = {
+          query: query.trim(),
+          selected_button: selectedButton,
+          selected_language: selectedLanguage,
+          uploaded_files: uploadedFiles,
+        };
+
+        console.log("Submitting query:", queryData);
+        const response = await queryAPI.search(queryData);
+
+        if (response.success) {
+          console.log("Query response:", response);
+          const message = `Query processed successfully! ${response.message}`;
+          toast ? toast.success(message) : alert(message);
+        } else {
+          console.error("Query failed:", response.message);
+          const message = `Query failed: ${response.message}`;
+          toast ? toast.error(message) : alert(message);
+        }
+      } catch (error) {
+        console.error("Query error:", error);
+        const message = `Query error: ${error.message}`;
         toast ? toast.error(message) : alert(message);
       }
-    } catch (error) {
-      console.error("Query error:", error);
-      const message = `Query error: ${error.message}`;
-      toast ? toast.error(message) : alert(message);
     }
-  }
-};
+  };
 
-const handleFileUpload = async (files) => {
-  const fileArray = Array.from(files);
-  
-  if (selectedButton === "Translation") {
-    // For translation mode, ONLY handle files locally - no server upload
-    const validFiles = [];
-    const invalidFiles = [];
+  const handleFileUpload = async (files) => {
+    const fileArray = Array.from(files);
+    
+    if (selectedButton === "Translation") {
+      // For translation mode, ONLY handle files locally - no server upload
+      const validFiles = [];
+      const invalidFiles = [];
 
-    fileArray.forEach(file => {
+      fileArray.forEach(file => {
+        const validTypes = [
+          "application/pdf",
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        ];
+        
+        const isValidType = validTypes.includes(file.type) || file.name.match(/\.(pdf|docx|pptx)$/i);
+
+        if (isValidType) {
+          const fileObj = {
+            id: Date.now() + Math.random(),
+            name: file.name,
+            size: file.size,
+            type: file.type,
+            file: file
+          };
+          validFiles.push(fileObj);
+        } else {
+          invalidFiles.push(file.name);
+        }
+      });
+
+      if (validFiles.length > 0) {
+        setUploadedFiles(prev => [...prev, ...validFiles]);
+        const message = `${validFiles.length} file(s) ready for translation`;
+        toast ? toast.success(message) : console.log(message);
+      }
+
+      if (invalidFiles.length > 0) {
+        const message = `Invalid files (only PDF, DOCX, PPTX allowed): ${invalidFiles.join(', ')}`;
+        toast ? toast.error(message) : alert(message);
+      }
+
+      return;
+    }
+
+    // For other modes (non-translation), validate files first
+    const validFiles = fileArray.filter((file) => {
       const validTypes = [
         "application/pdf",
+        "application/msword", 
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        "text/plain",
+        "application/vnd.ms-excel",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       ];
-      
-      const isValidType = validTypes.includes(file.type) || file.name.match(/\.(pdf|docx|pptx)$/i);
-
-      if (isValidType) {
-        const fileObj = {
-          id: Date.now() + Math.random(),
-          name: file.name,
-          size: file.size,
-          type: file.type,
-          file: file
-        };
-        validFiles.push(fileObj);
-      } else {
-        invalidFiles.push(file.name);
-      }
+      return (
+        validTypes.includes(file.type) ||
+        file.name.match(/\.(pdf|doc|docx|txt|xls|xlsx)$/i)
+      );
     });
 
-    if (validFiles.length > 0) {
-      setUploadedFiles(prev => [...prev, ...validFiles]);
-      const message = `${validFiles.length} file(s) ready for translation`;
-      toast ? toast.success(message) : console.log(message);
-    }
-
-    if (invalidFiles.length > 0) {
-      const message = `Invalid files (only PDF, DOCX, PPTX allowed): ${invalidFiles.join(', ')}`;
+    if (validFiles.length === 0) {
+      const message = "No valid files to upload";
       toast ? toast.error(message) : alert(message);
+      return;
     }
 
-    // Return early - no server upload for translation files
-    return;
-  }
+    // Upload to server only for non-translation modes
+    try {
+      const uploadPromises = validFiles.map((file) =>
+        queryAPI.uploadFile(file).catch(error => {
+          console.error(`Failed to upload ${file.name}:`, error);
+          return { success: false, error: error.message, fileName: file.name };
+        })
+      );
+      const uploadResults = await Promise.all(uploadPromises);
 
-  // For other modes (non-translation), validate files first
-  const validFiles = fileArray.filter((file) => {
-    const validTypes = [
-      "application/pdf",
-      "application/msword", 
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      "text/plain",
-      "application/vnd.ms-excel",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    ];
-    return (
-      validTypes.includes(file.type) ||
-      file.name.match(/\.(pdf|doc|docx|txt|xls|xlsx)$/i)
-    );
-  });
+      const successfulUploads = uploadResults
+        .filter((result) => result.success)
+        .map((result) => result.file);
 
-  if (validFiles.length === 0) {
-    const message = "No valid files to upload";
-    toast ? toast.error(message) : alert(message);
-    return;
-  }
-
-  // Upload to server only for non-translation modes
-  try {
-    const uploadPromises = validFiles.map((file) =>
-      queryAPI.uploadFile(file).catch(error => {
-        console.error(`Failed to upload ${file.name}:`, error);
-        return { success: false, error: error.message, fileName: file.name };
-      })
-    );
-    const uploadResults = await Promise.all(uploadPromises);
-
-    const successfulUploads = uploadResults
-      .filter((result) => result.success)
-      .map((result) => result.file);
-
-    if (successfulUploads.length > 0) {
-      setUploadedFiles((prev) => [...prev, ...successfulUploads]);
-      const message = `Successfully uploaded ${successfulUploads.length} files`;
-      toast ? toast.success(message) : console.log(message);
-    }
-
-    const failedUploads = uploadResults.filter((result) => !result.success);
-    if (failedUploads.length > 0) {
-      console.error("Some files failed to upload:", failedUploads);
-      
-      // Add failed files locally so user can still work with them
-      const localFiles = validFiles
-        .filter(file => failedUploads.some(failed => failed.fileName === file.name))
-        .map(file => ({
-          id: Date.now() + Math.random(),
-          name: file.name,
-          size: file.size,
-          type: file.type,
-          file: file,
-          uploadFailed: true
-        }));
-
-      if (localFiles.length > 0) {
-        setUploadedFiles((prev) => [...prev, ...localFiles]);
+      if (successfulUploads.length > 0) {
+        setUploadedFiles((prev) => [...prev, ...successfulUploads]);
+        const message = `Successfully uploaded ${successfulUploads.length} files`;
+        toast ? toast.success(message) : console.log(message);
       }
 
-      const message = `${failedUploads.length} files added locally (server upload failed)`;
+      const failedUploads = uploadResults.filter((result) => !result.success);
+      if (failedUploads.length > 0) {
+        console.error("Some files failed to upload:", failedUploads);
+        
+        const localFiles = validFiles
+          .filter(file => failedUploads.some(failed => failed.fileName === file.name))
+          .map(file => ({
+            id: Date.now() + Math.random(),
+            name: file.name,
+            size: file.size,
+            type: file.type,
+            file: file,
+            uploadFailed: true
+          }));
+
+        if (localFiles.length > 0) {
+          setUploadedFiles((prev) => [...prev, ...localFiles]);
+        }
+
+        const message = `${failedUploads.length} files added locally (server upload failed)`;
+        toast ? toast.warning(message) : console.warn(message);
+      }
+    } catch (error) {
+      console.error("File upload error:", error);
+      
+      const localFiles = validFiles.map(file => ({
+        id: Date.now() + Math.random(),
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        file: file,
+        uploadFailed: true
+      }));
+
+      setUploadedFiles((prev) => [...prev, ...localFiles]);
+      
+      const message = `Files added locally (server unavailable)`;
       toast ? toast.warning(message) : console.warn(message);
     }
-  } catch (error) {
-    console.error("File upload error:", error);
-    
-    // Fallback: add files locally
-    const localFiles = validFiles.map(file => ({
-      id: Date.now() + Math.random(),
-      name: file.name,
-      size: file.size,
-      type: file.type,
-      file: file,
-      uploadFailed: true
-    }));
-
-    setUploadedFiles((prev) => [...prev, ...localFiles]);
-    
-    const message = `Files added locally (server unavailable)`;
-    toast ? toast.warning(message) : console.warn(message);
-  }
-};
+  };
 
   const handleFileInputChange = (e) => {
     handleFileUpload(e.target.files);
@@ -775,6 +926,7 @@ const handleFileUpload = async (files) => {
       setTranslationResult(null);
       setTranslationJobs([]);
       setJobStatuses({});
+      setEvaluationData({});
       setPreviewText("");
       setPreviewFile(null);
       setPreviewFileType(null);
@@ -877,6 +1029,7 @@ const handleFileUpload = async (files) => {
     translationResult,
     translationJobs,
     jobStatuses,
+    evaluationData,
     previewText,
     showPreview,
     setShowPreview,
@@ -902,6 +1055,7 @@ const handleFileUpload = async (files) => {
     handleDrop,
     removeFile,
     handleDownload,
-    handleDownloadAll
+    handleDownloadAll,
+    fetchEvaluation
   };
 };

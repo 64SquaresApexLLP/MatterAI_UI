@@ -18,7 +18,11 @@ import {
   BellOff,
   Clock,
   AlertCircle,
-  DownloadCloud
+  DownloadCloud,
+  TrendingUp,
+  AlertTriangle,
+  Info,
+  Globe
 } from "lucide-react";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -79,6 +83,13 @@ const getStatusColor = (status) => {
   }
 };
 
+const getAccuracyColor = (accuracy) => {
+  if (accuracy >= 80) return 'text-green-600 bg-green-50 border-green-200';
+  if (accuracy >= 60) return 'text-yellow-600 bg-yellow-50 border-yellow-200';
+  if (accuracy >= 40) return 'text-orange-600 bg-orange-50 border-orange-200';
+  return 'text-red-600 bg-red-50 border-red-200';
+};
+
 const Home = ({ user, onBack, onLogout }) => {
   const {
     percentage,
@@ -95,6 +106,7 @@ const Home = ({ user, onBack, onLogout }) => {
     translationResult,
     translationJobs,
     jobStatuses,
+    evaluationData,
     previewText,
     showPreview,
     setShowPreview,
@@ -120,20 +132,22 @@ const Home = ({ user, onBack, onLogout }) => {
     handleDrop,
     removeFile,
     handleDownload,
-    handleDownloadAll
+    handleDownloadAll,
+    fetchEvaluation
   } = useHomeLogic();
 
   const [numPages, setNumPages] = useState(null);
   const [pageNumber, setPageNumber] = useState(1);
   const [selectedJobForPreview, setSelectedJobForPreview] = useState(null);
   const [previewingFile, setPreviewingFile] = useState(null);
+  const [showEvaluationDetails, setShowEvaluationDetails] = useState({});
   const docxPreviewRef = useRef(null);
 
   const [showFileSelector, setShowFileSelector] = useState(false);
 
   useEffect(() => {
-  setShowFileSelector(translationJobs.length > 0);
-}, [translationJobs]);
+    setShowFileSelector(translationJobs.length > 0);
+  }, [translationJobs]);
 
   // Handle preview file loading when a job is selected for preview
   useEffect(() => {
@@ -179,10 +193,8 @@ const Home = ({ user, onBack, onLogout }) => {
 
   useEffect(() => {
     if (previewingFile?.file && previewingFile.type === 'docx' && docxPreviewRef.current) {
-      // Clear previous content
       docxPreviewRef.current.innerHTML = '';
       
-      // Render DOCX preview
       renderAsync(previewingFile.file, docxPreviewRef.current, undefined, {
         className: 'docx-wrapper',
         inWrapper: true,
@@ -231,8 +243,54 @@ const Home = ({ user, onBack, onLogout }) => {
     setPageNumber(prev => Math.min(prev + 1, numPages));
   };
 
+  const toggleEvaluationDetails = (jobId) => {
+    setShowEvaluationDetails(prev => ({
+      ...prev,
+      [jobId]: !prev[jobId]
+    }));
+  };
+
+  // Get unique languages from completed jobs
+  const getCompletedLanguages = () => {
+    const languages = new Set();
+    translationJobs.forEach(job => {
+      const status = jobStatuses[job.job_id];
+      if (status?.status === 'COMPLETED') {
+        languages.add(job.target_language);
+      }
+    });
+    return Array.from(languages);
+  };
+
+  // Group jobs by filename
+  const groupJobsByFilename = () => {
+    const grouped = {};
+    translationJobs.forEach(job => {
+      if (!grouped[job.filename]) {
+        grouped[job.filename] = [];
+      }
+      grouped[job.filename].push(job);
+    });
+    return grouped;
+  };
+
+  const groupedJobs = groupJobsByFilename();
+
+  // Helper to detect if single file + multiple languages
+  const detectMultiLanguageMode = () => {
+    if (uploadedFiles.length === 1 && query.trim()) {
+      const lowerQuery = query.toLowerCase();
+      const languageKeywords = ['german', 'french', 'spanish', 'italian', 'chinese', 'japanese', 'korean', 'swedish', 'danish', 'dutch', 'finnish', 'english'];
+      const foundLanguages = languageKeywords.filter(lang => lowerQuery.includes(lang));
+      return foundLanguages.length > 1;
+    }
+    return false;
+  };
+
+  const isMultiLanguageMode = detectMultiLanguageMode();
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-[#062e69] to-slate-800 flex relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-[#062e69] to-slate-800 flex sticky overflow-hidden">
       <ToastContainer
         position="top-right"
         autoClose={3000}
@@ -326,7 +384,7 @@ const Home = ({ user, onBack, onLogout }) => {
       </div>
 
       {/* Main Content */}
-      <div className={`flex-1 p-6 transition-all duration-300 ${showPreview ? 'pr-2' : ''}`}>
+      <div className={`flex-1 p-6 overflow-y-auto sticky max-h-screen transition-all duration-300 ${showPreview ? 'pr-2' : ''}`}>
         <div className={`relative z-10 w-full mx-auto transition-all duration-300 ${showPreview ? 'max-w-3xl' : 'max-w-4xl'}`}>
           {/* Logo and Title */}
           <div className="text-center mb-12 animate-fade-in pt-16">
@@ -365,9 +423,8 @@ const Home = ({ user, onBack, onLogout }) => {
                   type="text"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  // placeholder="Case related questions or Translate something here..."
                   placeholder={selectedButton === "Translation" 
-                  ? "Enter translation instructions (e.g., 'Translate to Spanish') or select language..." 
+                  ? "Enter translation instructions (e.g., 'Translate to Spanish, French, and German') or select language..." 
                   : "Case related questions..."}
                   className="flex-1 bg-transparent text-[#062e69] placeholder-[#062e69]/50 focus:outline-none text-lg font-medium"
                 />
@@ -422,7 +479,7 @@ const Home = ({ user, onBack, onLogout }) => {
                   type="file"
                   ref={fileInputRef}
                   onChange={handleFileInputChange}
-                  multiple
+                  multiple={!isMultiLanguageMode}
                   accept={selectedButton === "Translation" ? ".pdf,.docx,.pptx" : ".pdf,.doc,.docx,.txt,.xls,.xlsx"}
                   className="hidden"
                 />
@@ -462,12 +519,14 @@ const Home = ({ user, onBack, onLogout }) => {
                     <>
                       <span>Translate</span>
                     </>
-                  ) : (
+                  ) 
+                  : (
                     <>
-                      <span>Ask</span>
+                      <span>Translate</span>
                       <Send className="w-4 h-4" />
                     </>
-                  )}
+                  )
+                  }
                 </button>
               </div>
               {isDragOver && (
@@ -481,10 +540,42 @@ const Home = ({ user, onBack, onLogout }) => {
             </div>
           </div>
 
+          {/* Multi-Language Mode Indicator */}
+          {selectedButton === "Translation" && isMultiLanguageMode && (
+            <div className="mb-4 p-3 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg animate-slide-up">
+              <div className="flex items-center space-x-2">
+                <Globe className="w-5 h-5 text-blue-600" />
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-blue-900">
+                    🌍 Multi-Language Mode Active
+                  </p>
+                  <p className="text-xs text-blue-700 mt-0.5">
+                    Your file will be translated to multiple languages based on your prompt
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Help Text */}
           {selectedButton === "Translation" && (
-          <div className="mb-2 text-xs text-[#062e69]/60 text-center bg-white/80 rounded-lg p-2">
-          💡 <strong>Tip:</strong> Select a language from the dropdown OR include it in your prompt (e.g., "Translate to German")
-          </div>
+            <div className="mb-2 text-xs text-white/70 text-center bg-white/10 backdrop-blur-sm rounded-lg p-3 border border-white/20">
+              <div className="space-y-1">
+                <div className="flex items-center justify-center space-x-2">
+                  <Languages className="w-4 h-4" />
+                  <strong>Translation Options:</strong>
+                </div>
+                <p>
+                  📋 <strong>Single Language:</strong> Select language dropdown OR type "Translate to Spanish"
+                </p>
+                <p>
+                  🌐 <strong>Multiple Languages:</strong> Upload 1 file + type "Translate to German, French, and Spanish"
+                </p>
+                <p>
+                  📚 <strong>Multiple Files:</strong> Upload multiple files + select one language
+                </p>
+              </div>
+            </div>
           )}
 
           {isListening && (
@@ -507,8 +598,14 @@ const Home = ({ user, onBack, onLogout }) => {
             <div className="mb-8 animate-slide-up delay-300">
               <div className="bg-white/90 backdrop-blur-xl border border-[#062e69]/30 rounded-2xl p-4 shadow-lg">
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-[#062e69] font-medium text-sm">
-                    Uploaded Files ({uploadedFiles.length})
+                  <h3 className="text-[#062e69] font-medium text-sm flex items-center space-x-2">
+                    <FileText className="w-4 h-4" />
+                    <span>Uploaded Files ({uploadedFiles.length})</span>
+                    {isMultiLanguageMode && (
+                      <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full border border-blue-300">
+                        Multi-language mode
+                      </span>
+                    )}
                   </h3>
                   <button
                     onClick={() => {
@@ -549,87 +646,202 @@ const Home = ({ user, onBack, onLogout }) => {
             </div>
           )}
 
-          {/* Translation Jobs Status Display */}
+          {/* Translation Jobs Status Display - Grouped by Filename */}
           {translationJobs.length > 0 && (
             <div className="mb-8 animate-slide-up delay-500">
               <div className="bg-white/90 backdrop-blur-xl border border-[#062e69]/30 rounded-2xl p-4 shadow-lg">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-semibold text-[#062e69] flex items-center space-x-2">
                     <Languages className="w-5 h-5" />
-                    <span>Translation Jobs ({translationJobs.length})</span>
+                    <span>Translation Jobs</span>
+                    <span className="text-sm font-normal text-[#062e69]/60">
+                      ({translationJobs.length} total, {Object.keys(groupedJobs).length} file{Object.keys(groupedJobs).length > 1 ? 's' : ''})
+                    </span>
                   </h3>
                   <button
                     onClick={handleDownloadAll}
                     className="flex items-center space-x-2 bg-[#062e69] text-white px-4 py-2 rounded-lg hover:bg-[#062e69]/90 transition-colors text-sm"
                   >
                     <DownloadCloud className="w-4 h-4" />
-                    <span>Download All</span>
+                    <span>Download All Completed</span>
                   </button>
                 </div>
+
+                {/* Debug Info - Remove this after testing */}
+                {process.env.NODE_ENV === 'development' && (
+                  <div className="mb-4 p-3 bg-gray-100 rounded text-xs font-mono">
+                    <div>Total Jobs: {translationJobs.length}</div>
+                    <div>Unique Files: {Object.keys(groupedJobs).length}</div>
+                    <div className="mt-2">
+                      Job Details:
+                      <ul className="list-disc ml-4 mt-1">
+                        {translationJobs.map((job, idx) => (
+                          <li key={idx}>
+                            {job.filename} → {job.target_language} (ID: {job.job_id.substring(0, 8)}...)
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                )}
                 
-                <div className="space-y-3">
-                  {translationJobs.map((job) => {
-                    const status = jobStatuses[job.job_id];
-                    return (
-                      <div
-                        key={job.job_id}
-                        className="bg-[#062e69]/5 rounded-lg p-4 border border-[#062e69]/10 hover:bg-[#062e69]/10 transition-all duration-200"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-3 flex-1 min-w-0">
-                            {getFileIcon(job.filename, "")}
-                            <div className="flex-1 min-w-0">
-                              <div className="text-[#062e69] font-medium text-sm truncate">
-                                {job.filename}
-                              </div>
-                              <div className="text-[#062e69]/60 text-xs">
-                                Target: {job.target_language}
-                              </div>
-                            </div>
-                          </div>
-                          
-                          <div className="flex items-center space-x-3">
-                            {/* Status */}
-                            <div className={`px-3 py-1 rounded-full text-xs font-medium border flex items-center space-x-1 ${getStatusColor(status?.status || 'PENDING')}`}>
-                              {getStatusIcon(status?.status || 'PENDING')}
-                              <span>{status?.status || 'PENDING'}</span>
-                            </div>
-                            
-                            {/* Preview Button */}
-                            {status?.status === 'COMPLETED' && (
-                              <button
-                                onClick={() => {
-                                  setSelectedJobForPreview(job.job_id);
-                                  setShowPreview(true);
-                                }}
-                                className="p-2 text-[#062e69]/70 hover:text-[#062e69] hover:bg-[#062e69]/10 rounded-lg transition-colors"
-                                title="Preview"
-                              >
-                                <Eye className="w-4 h-4" />
-                              </button>
-                            )}
-                            
-                            {/* Download Button */}
-                            {status?.status === 'COMPLETED' && (
-                              <button
-                                onClick={() => handleDownload(job.job_id)}
-                                className="p-2 text-[#062e69]/70 hover:text-[#062e69] hover:bg-[#062e69]/10 rounded-lg transition-colors"
-                                title="Download"
-                              >
-                                <Download className="w-4 h-4" />
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                        
-                        {status?.updated_at && (
-                          <div className="mt-2 text-xs text-[#062e69]/50">
-                            Last updated: {new Date(status.updated_at).toLocaleString()}
-                          </div>
-                        )}
+                <div className="space-y-4">
+                  {Object.entries(groupedJobs).map(([filename, jobs]) => (
+                    <div key={filename} className="border border-[#062e69]/20 rounded-xl p-4 bg-[#062e69]/5">
+                      <div className="flex items-center space-x-2 mb-3">
+                        {getFileIcon(filename, "")}
+                        <h4 className="font-semibold text-[#062e69]">{filename}</h4>
+                        <span className="text-xs text-[#062e69]/60">
+                          ({jobs.length} translation{jobs.length > 1 ? 's' : ''} - {jobs.map(j => j.target_language).join(', ')})
+                        </span>
                       </div>
-                    );
-                  })}
+                      
+                      <div className="space-y-2">
+                        {jobs.map((job) => {
+                          const status = jobStatuses[job.job_id];
+                          const evaluation = evaluationData[job.job_id];
+                          
+                          return (
+                            <div
+                              key={job.job_id}
+                              className="bg-white rounded-lg p-3 border border-[#062e69]/10 hover:bg-[#062e69]/5 transition-all duration-200"
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center space-x-3 flex-1 min-w-0">
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center space-x-2">
+                                      <span className="text-[#062e69] font-medium text-sm">
+                                        {job.target_language.toUpperCase()}
+                                      </span>
+                                      {evaluation && evaluation.combined_accuracy !== undefined && (
+                                        <div className={`px-2 py-0.5 rounded-full text-xs font-medium border flex items-center space-x-1 ${getAccuracyColor(evaluation.combined_accuracy)}`}>
+                                          <TrendingUp className="w-3 h-3" />
+                                          <span>{evaluation.combined_accuracy}% accuracy</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                    {status?.updated_at && (
+                                      <div className="text-xs text-[#062e69]/50 mt-0.5">
+                                        {new Date(status.updated_at).toLocaleString()}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                                
+                                <div className="flex items-center space-x-2">
+                                  {/* Status */}
+                                  <div className={`px-2 py-1 rounded-full text-xs font-medium border flex items-center space-x-1 ${getStatusColor(status?.status || 'PENDING')}`}>
+                                    {getStatusIcon(status?.status || 'PENDING')}
+                                    <span>{status?.status || 'PENDING'}</span>
+                                  </div>
+                                  
+                                  {/* Evaluation Info Button */}
+                                  {evaluation && status?.status === 'COMPLETED' && (
+                                    <button
+                                      onClick={() => toggleEvaluationDetails(job.job_id)}
+                                      className="p-1.5 text-[#062e69]/70 hover:text-[#062e69] hover:bg-[#062e69]/10 rounded-lg transition-colors"
+                                      title="View Evaluation Details"
+                                    >
+                                      <Info className="w-4 h-4" />
+                                    </button>
+                                  )}
+                                  
+                                  {/* Preview Button */}
+                                  {status?.status === 'COMPLETED' && (
+                                    <button
+                                      onClick={() => {
+                                        setSelectedJobForPreview(job.job_id);
+                                        setShowPreview(true);
+                                      }}
+                                      className="p-1.5 text-[#062e69]/70 hover:text-[#062e69] hover:bg-[#062e69]/10 rounded-lg transition-colors"
+                                      title="Preview"
+                                    >
+                                      <Eye className="w-4 h-4" />
+                                    </button>
+                                  )}
+                                  
+                                  {/* Download Button */}
+                                  {status?.status === 'COMPLETED' && (
+                                    <button
+                                      onClick={() => handleDownload(job.job_id)}
+                                      className="p-1.5 text-[#062e69]/70 hover:text-[#062e69] hover:bg-[#062e69]/10 rounded-lg transition-colors"
+                                      title="Download"
+                                    >
+                                      <Download className="w-4 h-4" />
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                              
+                              {/* Evaluation Details Expandable Section */}
+                              {evaluation && showEvaluationDetails[job.job_id] && (
+                                <div className="mt-3 pt-3 border-t border-[#062e69]/10">
+                                  <div className="space-y-2 text-sm">
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-[#062e69]/70">Source Language:</span>
+                                      <span className="font-medium text-[#062e69]">{evaluation.source_language || 'N/A'}</span>
+                                    </div>
+                                    
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-[#062e69]/70">Evaluation Method:</span>
+                                      <span className="font-medium text-[#062e69] text-xs">{evaluation.evaluation_method || 'N/A'}</span>
+                                    </div>
+                                    
+                                    {evaluation.detailed_analysis && (
+                                      <>
+                                        {evaluation.detailed_analysis.strengths && evaluation.detailed_analysis.strengths.length > 0 && (
+                                          <div className="mt-2">
+                                            <div className="text-[#062e69]/70 font-medium mb-1 flex items-center space-x-1">
+                                              <CheckCircle className="w-3 h-3 text-green-500" />
+                                              <span>Strengths:</span>
+                                            </div>
+                                            <ul className="list-disc list-inside text-[#062e69]/80 space-y-0.5 ml-4">
+                                              {evaluation.detailed_analysis.strengths.map((strength, idx) => (
+                                                <li key={idx} className="text-xs">{strength}</li>
+                                              ))}
+                                            </ul>
+                                          </div>
+                                        )}
+                                        
+                                        {evaluation.detailed_analysis.improvement_areas && evaluation.detailed_analysis.improvement_areas.length > 0 && (
+                                          <div className="mt-2">
+                                            <div className="text-[#062e69]/70 font-medium mb-1 flex items-center space-x-1">
+                                              <AlertTriangle className="w-3 h-3 text-yellow-500" />
+                                              <span>Areas for Improvement:</span>
+                                            </div>
+                                            <ul className="list-disc list-inside text-[#062e69]/80 space-y-0.5 ml-4">
+                                              {evaluation.detailed_analysis.improvement_areas.map((area, idx) => (
+                                                <li key={idx} className="text-xs">{area}</li>
+                                              ))}
+                                            </ul>
+                                          </div>
+                                        )}
+                                        
+                                        {evaluation.detailed_analysis.overall_assessment && (
+                                          <div className="mt-2">
+                                            <div className="text-[#062e69]/70 font-medium mb-1">Overall Assessment:</div>
+                                            <p className="text-[#062e69]/80 text-xs bg-[#062e69]/5 p-2 rounded">
+                                              {evaluation.detailed_analysis.overall_assessment}
+                                            </p>
+                                          </div>
+                                        )}
+                                      </>
+                                    )}
+                                    
+                                    {evaluation.error && (
+                                      <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">
+                                        <strong>Evaluation Error:</strong> {evaluation.error}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
@@ -758,25 +970,29 @@ const Home = ({ user, onBack, onLogout }) => {
 
       {/* Preview Panel */}
       {showPreview && (
-        <div className="w-1/2 p-2 bg-white/5 backdrop-blur-sm border-l border-white/10 animate-slide-in-right">
-          <div className="h-full bg-white/95 backdrop-blur-xl border border-[#062e69]/30 rounded-2xl shadow-lg flex flex-col overflow-y-auto max-h-screen">
+        <div className="w-1/2 p-2 bg-white/5 backdrop-blur-sm border-l border-white/10 animate-slide-in-right sticky top-0 overflow-y-auto max-h-screen right-0 z-50">
+          <div className="h-full bg-white/95 backdrop-blur-xl border border-[#062e69]/30 rounded-2xl shadow-lg flex flex-col">
             {/* Preview Header */}
             <div className="flex items-center justify-between p-4 border-b border-[#062e69]/10">
               <div className="flex items-center space-x-2">
                 <button
-                onClick={handleClosePreview}
-                className="p-1 text-[#062e69]/60 hover:text-red-500 transition-colors rounded-lg hover:bg-red-50"
-                title="Close Preview"
-              >
-                <X className="w-4 h-4" />
-              </button>
+                  onClick={handleClosePreview}
+                  className="p-1 text-[#062e69]/60 hover:text-red-500 transition-colors rounded-lg hover:bg-red-50"
+                  title="Close Preview"
+                >
+                  <X className="w-4 h-4" />
+                </button>
                 <Eye className="w-5 h-5 text-[#062e69]" />
                 <h3 className="text-lg font-semibold text-[#062e69]">
                   Translation Preview
                 </h3>
 
-                {showFileSelector && translationJobs.length > 1 && (
-                  <p className="pl-5 text-lg">Accuracy: {percentage}%</p>
+                {/* Show accuracy for selected job */}
+                {selectedJobForPreview && evaluationData[selectedJobForPreview] && (
+                  <div className={`ml-4 px-3 py-1 rounded-full text-sm font-medium border flex items-center space-x-1 ${getAccuracyColor(evaluationData[selectedJobForPreview].combined_accuracy)}`}>
+                    <TrendingUp className="w-4 h-4" />
+                    <span>Accuracy: {evaluationData[selectedJobForPreview].combined_accuracy}%</span>
+                  </div>
                 )}
               </div>
               <button
@@ -789,33 +1005,64 @@ const Home = ({ user, onBack, onLogout }) => {
 
             {/* File Selection */}
             {translationJobs.length > 0 && (
-  <div className="p-4 border-b border-[#062e69]/10">
-    <label className="text-sm font-medium text-[#062e69]/70 mb-2 block">
-      Select file to preview:
-    </label>
-    <select
-      value={selectedJobForPreview || ''}
-      onChange={(e) => setSelectedJobForPreview(e.target.value)}
-      className="w-full p-2 border border-[#062e69]/30 rounded-lg bg-white text-[#062e69] focus:outline-none focus:border-[#062e69]/50"
-    >
-      <option value="">Choose a file...</option>
-      {translationJobs
-        .filter(job => jobStatuses[job.job_id]?.status === 'COMPLETED')
-        .map(job => (
-          <option key={job.job_id} value={job.job_id}>
-            {job.filename}
-          </option>
-        ))}
-    </select>
-  </div>
-)}
+              <div className="p-4 border-b border-[#062e69]/10">
+                <label className="text-sm font-medium text-[#062e69]/70 mb-2 block">
+                  Select file to preview:
+                </label>
+                <select
+                  value={selectedJobForPreview || ''}
+                  onChange={(e) => setSelectedJobForPreview(e.target.value)}
+                  className="w-full p-2 border border-[#062e69]/30 rounded-lg bg-white text-[#062e69] focus:outline-none focus:border-[#062e69]/50"
+                >
+                  <option value="">Choose a file...</option>
+                  {translationJobs
+                    .filter(job => jobStatuses[job.job_id]?.status === 'COMPLETED')
+                    .map(job => {
+                      const evaluation = evaluationData[job.job_id];
+                      return (
+                        <option key={job.job_id} value={job.job_id}>
+                          {job.filename} - {job.target_language.toUpperCase()}
+                          {evaluation?.combined_accuracy !== undefined ? ` (${evaluation.combined_accuracy}% accuracy)` : ''}
+                        </option>
+                      );
+                    })}
+                </select>
+
+                {/* Show evaluation summary for selected job */}
+                {selectedJobForPreview && evaluationData[selectedJobForPreview] && (
+                  <div className="mt-3 p-3 bg-[#062e69]/5 rounded-lg border border-[#062e69]/10">
+                    <div className="text-xs space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[#062e69]/70">Source Language:</span>
+                        <span className="font-medium text-[#062e69]">
+                          {evaluationData[selectedJobForPreview].source_language || 'N/A'}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[#062e69]/70">Method:</span>
+                        <span className="font-medium text-[#062e69] text-xs">
+                          {evaluationData[selectedJobForPreview].evaluation_method || 'N/A'}
+                        </span>
+                      </div>
+                      {evaluationData[selectedJobForPreview].detailed_analysis?.overall_assessment && (
+                        <div className="mt-2 pt-2 border-t border-[#062e69]/10">
+                          <p className="text-[#062e69]/80 text-xs italic">
+                            {evaluationData[selectedJobForPreview].detailed_analysis.overall_assessment}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Preview Content */}
             <div className="flex-1 p-4 overflow-y-auto">
               {previewingFile && previewingFile.type === 'pdf' ? (
                 <div className="flex flex-col items-center">
                   <Document
-                    file={previewingFile.file} // This will now be a blob URL string
+                    file={previewingFile.file}
                     onLoadSuccess={onDocumentLoadSuccess}
                     loading={
                       <div className="flex items-center justify-center p-8">
