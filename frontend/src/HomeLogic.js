@@ -5,6 +5,25 @@ import { queryAPI } from "./api/apiService.js";
 // Translation API Service
 const TRANSLATION_API_BASE_URL = import.meta.env.VITE_TRANSLATION_API_URL;
 
+export const detectCJKLanguage = (filename, targetLanguage) => {
+  const cjkLanguages = ['chinese', 'mandarin', 'cantonese', 'japanese', 'korean', 'zh', 'ja', 'ko', 'cn', 'jp', 'kr'];
+  
+  // Check target language
+  if (targetLanguage && cjkLanguages.some(lang => 
+    targetLanguage.toLowerCase().includes(lang)
+  )) {
+    return true;
+  }
+  
+  // Check if filename contains CJK characters
+  const cjkRegex = /[\u4e00-\u9fff\u3400-\u4dbf\u3040-\u309f\u30a0-\u30ff\uac00-\ud7af]/;
+  if (cjkRegex.test(filename)) {
+    return true;
+  }
+  
+  return false;
+};
+
 // Language mapping to match backend expectations
 const LANGUAGE_MAPPING = {
   "Chinese (Mandarin)": "simplified chinese",
@@ -376,10 +395,13 @@ export const useHomeLogic = () => {
     }
   }, []);
 
-  // Fetch evaluation data
+  // FIXED: Enhanced Fetch evaluation data with better error handling
   const fetchEvaluation = async (evaluationId, jobId) => {
     try {
+      console.log(`Fetching evaluation for job ${jobId}, evaluation ID: ${evaluationId}`);
       const evaluation = await translationAPI.getEvaluation(evaluationId);
+      console.log(`Evaluation data received for job ${jobId}:`, evaluation);
+      
       setEvaluationData(prev => ({
         ...prev,
         [jobId]: evaluation
@@ -389,12 +411,15 @@ export const useHomeLogic = () => {
       console.error(`Evaluation fetch error for ${evaluationId}:`, error);
       setEvaluationData(prev => ({
         ...prev,
-        [jobId]: { error: error.message }
+        [jobId]: { 
+          error: error.message,
+          combined_accuracy: null 
+        }
       }));
     }
   };
 
-  // Poll job status
+  // FIXED: Enhanced Poll job status with better evaluation handling
   const pollJobStatus = async (jobId, filename) => {
     const maxAttempts = 60; // 5 minutes with 5-second intervals
     let attempts = 0;
@@ -402,7 +427,10 @@ export const useHomeLogic = () => {
     const poll = async () => {
       try {
         attempts++;
+        console.log(`Polling job ${jobId} (attempt ${attempts}/${maxAttempts})`);
         const status = await translationAPI.checkStatus(jobId);
+        
+        console.log(`Job ${jobId} status:`, status);
         
         setJobStatuses(prev => ({
           ...prev,
@@ -410,9 +438,17 @@ export const useHomeLogic = () => {
         }));
 
         if (status.status === 'COMPLETED') {
-          // Fetch evaluation data if available
+          console.log(`Job ${jobId} completed!`);
+          
+          // FIXED: Fetch evaluation data if available with retry
           if (status.evaluation_id) {
-            await fetchEvaluation(status.evaluation_id, jobId);
+            console.log(`Fetching evaluation for completed job ${jobId}`);
+            // Add a small delay to ensure evaluation is ready
+            setTimeout(async () => {
+              await fetchEvaluation(status.evaluation_id, jobId);
+            }, 1000);
+          } else {
+            console.log(`No evaluation_id found for job ${jobId}`);
           }
 
           // Show completion notification
@@ -422,9 +458,11 @@ export const useHomeLogic = () => {
           );
           return status;
         } else if (status.status === 'FAILED') {
-          throw new Error(`Translation failed for ${filename}`);
+          console.error(`Job ${jobId} failed:`, status.error || 'Unknown error');
+          throw new Error(`Translation failed for ${filename}: ${status.error || 'Unknown error'}`);
         } else if (attempts < maxAttempts) {
           // Continue polling
+          console.log(`Job ${jobId} still in progress (${status.status}), will check again in 5 seconds`);
           setTimeout(poll, 5000);
         } else {
           throw new Error(`Translation timeout for ${filename}`);
@@ -439,6 +477,17 @@ export const useHomeLogic = () => {
     };
 
     poll();
+  };
+
+  // NEW: Manual refresh for evaluations
+  const refreshEvaluations = async () => {
+    console.log('Refreshing evaluations for all completed jobs...');
+    for (const [jobId, status] of Object.entries(jobStatuses)) {
+      if (status.status === 'COMPLETED' && status.evaluation_id && !evaluationData[jobId]) {
+        console.log(`Refreshing evaluation for job ${jobId}`);
+        await fetchEvaluation(status.evaluation_id, jobId);
+      }
+    }
   };
 
   const handleRequestNotificationPermission = async () => {
@@ -934,22 +983,31 @@ export const useHomeLogic = () => {
     }
   };
 
-  const handleDownload = async (jobId) => {
-    const jobStatus = jobStatuses[jobId];
-    if (!jobStatus?.download_id) {
-      const message = "No download available yet. Please wait for translation to complete.";
-      toast ? toast.error(message) : alert(message);
-      return;
-    }
+  const handleDownload = async (jobId, forceDirectDownload = false) => {
+  const jobStatus = jobStatuses[jobId];
+  if (!jobStatus?.download_id) {
+    const message = "No download available yet. Please wait for translation to complete.";
+    toast ? toast.error(message) : alert(message);
+    return;
+  }
 
-    const downloadToast = toast ? toast.loading("Preparing download...") : null;
+  // Find the corresponding job to get filename and target language
+  const job = translationJobs.find(j => j.job_id === jobId);
+  const isPDF = job?.filename?.toLowerCase().endsWith('.pdf');
+  const isCJK = job && detectCJKLanguage(job.filename, job.target_language);
+  
+  // For CJK PDFs or forced direct download, skip preview and download directly
+  if (forceDirectDownload || (isPDF && isCJK)) {
+    console.log(`Direct download triggered for ${job?.filename} (CJK: ${isCJK}, Forced: ${forceDirectDownload})`);
+    
+    const downloadToast = toast ? toast.loading("Starting download...") : null;
 
     try {
       const response = await translationAPI.download(jobStatus.download_id);
       const blob = await response.blob();
 
       const contentDisposition = response.headers.get('content-disposition');
-      let filename = jobStatus.filename || 'translated_document';
+      let filename = jobStatus.filename || job?.filename || 'translated_document';
 
       if (contentDisposition && contentDisposition.includes('filename=')) {
         filename = contentDisposition
@@ -993,6 +1051,65 @@ export const useHomeLogic = () => {
         alert(errorMessage);
       }
     }
+    return;
+  }
+
+  // Original download logic for non-CJK files (with potential preview)
+  const downloadToast = toast ? toast.loading("Preparing download...") : null;
+
+  try {
+    const response = await translationAPI.download(jobStatus.download_id);
+    const blob = await response.blob();
+
+    const contentDisposition = response.headers.get('content-disposition');
+    let filename = jobStatus.filename || job?.filename || 'translated_document';
+
+    if (contentDisposition && contentDisposition.includes('filename=')) {
+      filename = contentDisposition
+        .split('filename=')[1]
+        .split(';')[0]
+        .replace(/"/g, '');
+    }
+
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.style.display = 'none';
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+
+    if (toast) {
+      toast.update(downloadToast, {
+        render: `${filename} downloaded successfully!`,
+        type: "success",
+        isLoading: false,
+        autoClose: 3000,
+      });
+    } else {
+      alert(`${filename} downloaded successfully!`);
+    }
+  } catch (error) {
+    console.error("Download error:", error);
+    const errorMessage = `Download failed: ${error.message}`;
+    
+    if (toast) {
+      toast.update(downloadToast, {
+        render: errorMessage,
+        type: "error",
+        isLoading: false,
+        autoClose: 5000,
+      });
+    } else {
+      alert(errorMessage);
+    }
+  }
+};
+
+  const handleDirectDownload = async (jobId) => {
+    await handleDownload(jobId, true);
   };
 
   const handleDownloadAll = async () => {
@@ -1056,6 +1173,8 @@ export const useHomeLogic = () => {
     removeFile,
     handleDownload,
     handleDownloadAll,
-    fetchEvaluation
+    detectCJKLanguage,
+    fetchEvaluation,
+    refreshEvaluations  // NEW: Export the manual refresh function
   };
 };

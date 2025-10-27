@@ -39,7 +39,43 @@ import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 import { renderAsync } from 'docx-preview';
 
+import TimesheetOptions from "./TimesheetOptions";
+
+import { loadNotoCJK } from "./utils/loadNotoCJK";
+import { previewCJKPdf } from "./utils/previewCJKPdf";
+import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
+
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+
+const pdfOptions = {
+  cMapUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/cmaps/`,
+  cMapPacked: true,
+  enableXfa: true,
+  standardFontDataUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/standard_fonts/`,
+  useOnlyCssZoom: true,
+  textLayerMode: 2,
+  annotationMode: 2,
+  verbosity: 1
+};
+
+// Add these helper functions near the top of your Home component
+const containsCJK = (text) => {
+  const cjkRegex = /[\u2E80-\u2EFF\u2F00-\u2FDF\u3040-\u309F\u30A0-\u30FF\u3100-\u312F\u3200-\u32FF\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/;
+  return cjkRegex.test(text);
+};
+
+// Helper function to detect if PDF might contain CJK based on filename or content
+const isPotentiallyCJK = (filename, targetLanguage = '') => {
+  const cjkLanguages = ['chinese', 'japanese', 'korean', 'zh', 'ja', 'ko', 'cn', 'jp', 'kr', '中文', '日本語', '한국어'];
+  const lowerFilename = filename.toLowerCase();
+  const lowerLanguage = targetLanguage.toLowerCase();
+  return cjkLanguages.some(lang => 
+    lowerFilename.includes(lang) || 
+    lowerLanguage.includes(lang) || 
+    containsCJK(filename) || 
+    containsCJK(targetLanguage)
+  );
+};
 
 const getFileIcon = (fileName, fileType) => {
   if (fileType === "application/pdf" || fileName.endsWith(".pdf")) {
@@ -141,6 +177,9 @@ const Home = ({ user, onBack, onLogout }) => {
   const [selectedJobForPreview, setSelectedJobForPreview] = useState(null);
   const [previewingFile, setPreviewingFile] = useState(null);
   const [showEvaluationDetails, setShowEvaluationDetails] = useState({});
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [currentPreviewFileType, setCurrentPreviewFileType] = useState(null);
+  const [useCJKMode, setUseCJKMode] = useState(false);
   const docxPreviewRef = useRef(null);
 
   const [showFileSelector, setShowFileSelector] = useState(false);
@@ -149,85 +188,148 @@ const Home = ({ user, onBack, onLogout }) => {
     setShowFileSelector(translationJobs.length > 0);
   }, [translationJobs]);
 
+  // CJK PDF Preview Function
+  // const previewCJKPdf = async (downloadId) => {
+  //   try {
+  //     const response = await fetch(`${import.meta.env.VITE_TRANSLATION_API_URL}/download/${downloadId}`, {
+  //       method: 'GET',
+  //     });
+
+  //     if (response.ok) {
+  //       const blob = await response.blob();
+  //       const url = URL.createObjectURL(blob);
+  //       setPreviewUrl(url);
+  //       setCurrentPreviewFileType('application/pdf');
+  //       setUseCJKMode(true);
+  //     } else {
+  //       console.error('Failed to fetch PDF for CJK preview');
+  //     }
+  //   } catch (err) {
+  //     console.error('CJK PDF Preview fetch error', err);
+  //   }
+  // };
+
   // Handle preview file loading when a job is selected for preview
   useEffect(() => {
-    const loadPreviewFile = async () => {
-      if (selectedJobForPreview && jobStatuses[selectedJobForPreview]?.status === 'COMPLETED') {
-        const jobStatus = jobStatuses[selectedJobForPreview];
-        if (jobStatus.download_id) {
-          try {
-            const response = await fetch(`${import.meta.env.VITE_TRANSLATION_API_URL}/download/${jobStatus.download_id}`, {
-              method: 'GET',
-            });
+  const loadPreviewFile = async () => {
+    if (selectedJobForPreview && jobStatuses[selectedJobForPreview]?.status === 'COMPLETED') {
+      const jobStatus = jobStatuses[selectedJobForPreview];
+      const selectedJob = translationJobs.find(job => job.job_id === selectedJobForPreview);
+      
+      if (jobStatus.download_id && selectedJob) {
+        try {
+          // Check if this might be a CJK file
+          const mightBeCJK = isPotentiallyCJK(selectedJob.filename, selectedJob.target_language);
 
-            if (response.ok) {
-              const blob = await response.blob();
-              const contentType = response.headers.get('content-type');
-              
-              let fileType = null;
-              if (contentType) {
-                if (contentType.includes('application/pdf')) {
-                  fileType = 'pdf';
-                } else if (contentType.includes('application/vnd.openxmlformats-officedocument.wordprocessingml.document')) {
-                  fileType = 'docx';
-                }
-              }
+          const response = await fetch(`${import.meta.env.VITE_TRANSLATION_API_URL}/download/${jobStatus.download_id}`, {
+            method: 'GET',
+          });
 
-              if (fileType === 'pdf') {
-                const blobUrl = URL.createObjectURL(blob);
-                setPreviewingFile({ file: blobUrl, type: fileType, jobId: selectedJobForPreview });
+          if (response.ok) {
+            const contentType = response.headers.get('content-type');
+            
+            if (contentType && contentType.includes('application/pdf')) {
+              if (mightBeCJK) {
+                // 🔥 USE THE IMPORTED FUNCTIONS HERE 🔥
+                await loadNotoCJK(); // Load font first
+                await previewCJKPdf(
+                  jobStatus.download_id,
+                  setPreviewUrl,
+                  setCurrentPreviewFileType,
+                  setUseCJKMode,
+                  setShowPreview
+                );
+                setPreviewingFile(null); // Clear react-pdf preview
               } else {
-                setPreviewingFile({ file: blob, type: fileType, jobId: selectedJobForPreview });
+                // Use standard react-pdf preview
+                const blob = await response.blob();
+                const blobUrl = URL.createObjectURL(blob);
+                setPreviewingFile({ file: blobUrl, type: 'pdf', jobId: selectedJobForPreview });
+                setUseCJKMode(false);
+                setPreviewUrl(null);
+                setCurrentPreviewFileType(null);
               }
+            } else if (contentType && contentType.includes('application/vnd.openxmlformats-officedocument.wordprocessingml.document')) {
+              const blob = await response.blob();
+              setPreviewingFile({ file: blob, type: 'docx', jobId: selectedJobForPreview });
+              setUseCJKMode(false);
+              setPreviewUrl(null);
+              setCurrentPreviewFileType(null);
             }
-          } catch (error) {
-            console.error('Error loading preview file:', error);
-            setPreviewingFile(null);
           }
+        } catch (error) {
+          console.error('Error loading preview file:', error);
+          setPreviewingFile(null);
+          setPreviewUrl(null);
+          setCurrentPreviewFileType(null);
+          setUseCJKMode(false);
         }
       }
-    };
+    }
+  };
 
-    loadPreviewFile();
-  }, [selectedJobForPreview, jobStatuses]);
+  loadPreviewFile();
+}, [selectedJobForPreview, jobStatuses, translationJobs]);
 
   useEffect(() => {
-    if (previewingFile?.file && previewingFile.type === 'docx' && docxPreviewRef.current) {
-      docxPreviewRef.current.innerHTML = '';
-      
-      renderAsync(previewingFile.file, docxPreviewRef.current, undefined, {
-        className: 'docx-wrapper',
-        inWrapper: true,
-        ignoreWidth: false,
-        ignoreHeight: false,
-        ignoreFonts: false,
-        breakPages: true,
-        ignoreLastRenderedPageBreak: true,
-        experimental: false,
-        trimXmlDeclaration: true,
-        useBase64URL: false,
-        renderChanges: false,
-        renderHeaders: true,
-        renderFooters: true,
-        renderFootnotes: true,
-        renderEndnotes: true,
-      }).catch(error => {
-        console.error('Error rendering DOCX:', error);
-        docxPreviewRef.current.innerHTML = '<p class="text-red-500 p-4">Error loading document preview</p>';
-      });
-    }
-  }, [previewingFile]);
+  if (previewingFile?.file && previewingFile.type === 'docx' && docxPreviewRef.current) {
+    docxPreviewRef.current.innerHTML = '';
+    
+    renderAsync(previewingFile.file, docxPreviewRef.current, undefined, {
+      className: 'docx-wrapper',
+      inWrapper: true,
+      ignoreWidth: false,
+      ignoreHeight: false,
+      ignoreFonts: false, // Keep this false to preserve fonts
+      breakPages: true,
+      ignoreLastRenderedPageBreak: true,
+      experimental: false,
+      trimXmlDeclaration: true,
+      useBase64URL: false,
+      renderChanges: false,
+      renderHeaders: true,
+      renderFooters: true,
+      renderFootnotes: true,
+      renderEndnotes: true,
+      fontMapping: {
+        'SimSun': 'SimSun, "MS Mincho", "Yu Gothic", "Malgun Gothic", serif',
+        'MS Mincho': 'SimSun, "MS Mincho", "Yu Gothic", serif', 
+        'Noto Sans CJK': 'Noto Sans CJK SC, Noto Sans CJK TC, Noto Sans CJK JP, Noto Sans CJK KR, sans-serif',
+        'Arial Unicode MS': 'Arial Unicode MS, "Yu Gothic", "Malgun Gothic", sans-serif',
+        'Malgun Gothic': 'Malgun Gothic, "Yu Gothic", sans-serif'
+      }
+    }).catch(error => {
+      console.error('Error rendering DOCX:', error);
+      docxPreviewRef.current.innerHTML = '<p class="text-red-500 p-4">Error loading document preview</p>';
+    });
+  }
+}, [previewingFile]);
+
+  // Add this useEffect to debug
+  useEffect(() => {
+  console.log('Translation Jobs:', translationJobs);
+  console.log('Job Statuses:', jobStatuses);
+  console.log('Evaluation Data:', evaluationData);
+  }, [translationJobs, jobStatuses, evaluationData]);
 
   const handleClosePreview = () => {
     setShowPreview(false);
     setPageNumber(1);
     setSelectedJobForPreview(null);
     
+    // Clean up blob URLs
     if (previewingFile?.file && typeof previewingFile.file === 'string' && previewingFile.file.startsWith('blob:')) {
       URL.revokeObjectURL(previewingFile.file);
     }
     
+    if (previewUrl && previewUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(previewUrl);
+    }
+    
     setPreviewingFile(null);
+    setPreviewUrl(null);
+    setCurrentPreviewFileType(null);
+    setUseCJKMode(false);
   };
 
   const onDocumentLoadSuccess = ({ numPages }) => {
@@ -248,18 +350,6 @@ const Home = ({ user, onBack, onLogout }) => {
       ...prev,
       [jobId]: !prev[jobId]
     }));
-  };
-
-  // Get unique languages from completed jobs
-  const getCompletedLanguages = () => {
-    const languages = new Set();
-    translationJobs.forEach(job => {
-      const status = jobStatuses[job.job_id];
-      if (status?.status === 'COMPLETED') {
-        languages.add(job.target_language);
-      }
-    });
-    return Array.from(languages);
   };
 
   // Group jobs by filename
@@ -290,7 +380,7 @@ const Home = ({ user, onBack, onLogout }) => {
   const isMultiLanguageMode = detectMultiLanguageMode();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-[#062e69] to-slate-800 flex sticky overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-[#062e69] to-slate-800 flex relative overflow-hidden">
       <ToastContainer
         position="top-right"
         autoClose={3000}
@@ -305,8 +395,7 @@ const Home = ({ user, onBack, onLogout }) => {
       />
 
       {/* Notification Permission Button */}
-      {
-      notificationHelper.isSupported() && notificationPermission !== "granted" && (
+      {notificationHelper.isSupported() && notificationPermission !== "granted" && (
         <div className="fixed top-20 right-4 z-50">
           <button
             onClick={handleRequestNotificationPermission}
@@ -384,7 +473,7 @@ const Home = ({ user, onBack, onLogout }) => {
       </div>
 
       {/* Main Content */}
-      <div className={`flex-1 p-6 overflow-y-auto sticky max-h-screen transition-all duration-300 ${showPreview ? 'pr-2' : ''}`}>
+      <div className={`flex-1 p-6 transition-all duration-300 ${showPreview ? 'pr-2' : ''}`}>
         <div className={`relative z-10 w-full mx-auto transition-all duration-300 ${showPreview ? 'max-w-3xl' : 'max-w-4xl'}`}>
           {/* Logo and Title */}
           <div className="text-center mb-12 animate-fade-in pt-16">
@@ -519,14 +608,12 @@ const Home = ({ user, onBack, onLogout }) => {
                     <>
                       <span>Translate</span>
                     </>
-                  ) 
-                  : (
+                  ) : (
                     <>
-                      <span>Translate</span>
+                      <span>Ask</span>
                       <Send className="w-4 h-4" />
                     </>
-                  )
-                  }
+                  )}
                 </button>
               </div>
               {isDragOver && (
@@ -666,24 +753,6 @@ const Home = ({ user, onBack, onLogout }) => {
                     <span>Download All Completed</span>
                   </button>
                 </div>
-
-                {/* Debug Info - Remove this after testing */}
-                {process.env.NODE_ENV === 'development' && (
-                  <div className="mb-4 p-3 bg-gray-100 rounded text-xs font-mono">
-                    <div>Total Jobs: {translationJobs.length}</div>
-                    <div>Unique Files: {Object.keys(groupedJobs).length}</div>
-                    <div className="mt-2">
-                      Job Details:
-                      <ul className="list-disc ml-4 mt-1">
-                        {translationJobs.map((job, idx) => (
-                          <li key={idx}>
-                            {job.filename} → {job.target_language} (ID: {job.job_id.substring(0, 8)}...)
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
-                )}
                 
                 <div className="space-y-4">
                   {Object.entries(groupedJobs).map(([filename, jobs]) => (
@@ -709,7 +778,7 @@ const Home = ({ user, onBack, onLogout }) => {
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center space-x-3 flex-1 min-w-0">
                                   <div className="flex-1 min-w-0">
-                                    <div className="flex items-center space-x-2">
+                                    <div className="flex items-center space-x-2 flex-wrap">
                                       <span className="text-[#062e69] font-medium text-sm">
                                         {job.target_language.toUpperCase()}
                                       </span>
@@ -947,7 +1016,8 @@ const Home = ({ user, onBack, onLogout }) => {
           {/* Timesheet Form */}
           {showTimesheet && (
             <div className="mt-8 animate-fade-in">
-              <TimesheetForm
+              <TimesheetOptions
+              user={user}
                 onClose={() => {
                   setShowTimesheet(false);
                 }}
@@ -970,8 +1040,8 @@ const Home = ({ user, onBack, onLogout }) => {
 
       {/* Preview Panel */}
       {showPreview && (
-        <div className="w-1/2 p-2 bg-white/5 backdrop-blur-sm border-l border-white/10 animate-slide-in-right sticky top-0 overflow-y-auto max-h-screen right-0 z-50">
-          <div className="h-full bg-white/95 backdrop-blur-xl border border-[#062e69]/30 rounded-2xl shadow-lg flex flex-col">
+        <div className="w-1/2 p-2 bg-white/5 backdrop-blur-sm border-l border-white/10 animate-slide-in-right overflow-y-auto max-h-screen">
+          <div className="h-full bg-white/95 backdrop-blur-xl border border-[#062e69]/30 rounded-2xl shadow-lg flex flex-col overflow-y-auto max-h-screen">
             {/* Preview Header */}
             <div className="flex items-center justify-between p-4 border-b border-[#062e69]/10">
               <div className="flex items-center space-x-2">
@@ -987,8 +1057,15 @@ const Home = ({ user, onBack, onLogout }) => {
                   Translation Preview
                 </h3>
 
+                {/* CJK Mode Indicator */}
+                {useCJKMode && (
+                  <div className="ml-4 px-3 py-1 bg-blue-100 text-blue-800 text-xs rounded-full border border-blue-300">
+                    🌏 CJK Mode
+                  </div>
+                )}
+
                 {/* Show accuracy for selected job */}
-                {selectedJobForPreview && evaluationData[selectedJobForPreview] && (
+                {selectedJobForPreview && evaluationData[selectedJobForPreview] && evaluationData[selectedJobForPreview].combined_accuracy !== undefined && (
                   <div className={`ml-4 px-3 py-1 rounded-full text-sm font-medium border flex items-center space-x-1 ${getAccuracyColor(evaluationData[selectedJobForPreview].combined_accuracy)}`}>
                     <TrendingUp className="w-4 h-4" />
                     <span>Accuracy: {evaluationData[selectedJobForPreview].combined_accuracy}%</span>
@@ -1029,7 +1106,7 @@ const Home = ({ user, onBack, onLogout }) => {
                 </select>
 
                 {/* Show evaluation summary for selected job */}
-                {selectedJobForPreview && evaluationData[selectedJobForPreview] && (
+                {selectedJobForPreview && evaluationData[selectedJobForPreview] && !evaluationData[selectedJobForPreview].error && (
                   <div className="mt-3 p-3 bg-[#062e69]/5 rounded-lg border border-[#062e69]/10">
                     <div className="text-xs space-y-1">
                       <div className="flex items-center justify-between">
@@ -1059,9 +1136,20 @@ const Home = ({ user, onBack, onLogout }) => {
 
             {/* Preview Content */}
             <div className="flex-1 p-4 overflow-y-auto">
-              {previewingFile && previewingFile.type === 'pdf' ? (
+              {/* CJK PDF Preview using iframe */}
+              {useCJKMode && previewUrl && currentPreviewFileType === 'application/pdf' ? (
+                <iframe
+                  src={previewUrl}
+                  title="PDF Preview"
+                  className="w-full h-full border-0 rounded-lg shadow-lg"
+                  style={{ minHeight: '600px' }}
+                />
+              ) : 
+              /* Standard PDF Preview using react-pdf */
+              previewingFile && previewingFile.type === 'pdf' ? (
                 <div className="flex flex-col items-center">
                   <Document
+                    options={pdfOptions}
                     file={previewingFile.file}
                     onLoadSuccess={onDocumentLoadSuccess}
                     loading={
@@ -1079,6 +1167,9 @@ const Home = ({ user, onBack, onLogout }) => {
                     }
                     onLoadError={(error) => {
                       console.error('PDF load error:', error);
+                      if (error.message.includes('font') || error.message.includes('character')) {
+                      console.warn('Possible CJK font issue detected');
+                      }
                     }}
                   >
                     <Page

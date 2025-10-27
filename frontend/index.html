@@ -6,9 +6,24 @@
     
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- CDN Links for Noto Sans CJK fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
   </head>
   <body>
     <div id="root"></div>
+    <!-- Load NotoSansCJK font using FontFace API -->
+    <script>
+      // Load the NotoSansCJK font
+      const loadNotoCJK = async () => {
+        const font = new FontFace('NotoSansCJK', 'url(../../public/NotoSansCJKRegular.otf)');
+        await font.load();
+        document.fonts.add(font);
+      };
+      loadNotoCJK();
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

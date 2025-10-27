@@ -6,7 +6,7 @@ import os
 # Import route modules
 from auth_routes import router as auth_router, init_users_table
 from query_routes import router as query_router
-from timesheet_routes import router as timesheet_router
+from timesheet_routes import router as timesheet_router, chatbot_router
 from file_routes import router as file_router
 from database_setup import initialize_database
 
@@ -41,6 +41,7 @@ app.mount("/static", StaticFiles(directory="uploads"), name="static")
 app.include_router(auth_router)
 app.include_router(query_router)
 app.include_router(timesheet_router)
+app.include_router(chatbot_router)
 app.include_router(file_router)
 
 # Root endpoint
@@ -56,6 +57,7 @@ async def root():
             "auth": "/auth",
             "query": "/query",
             "timesheet": "/timesheet",
+            "chatbot": "/chatbot",
             "files": "/files"
         }
     }
@@ -68,7 +70,7 @@ async def startup_event():
     try:
         if initialize_database():
             print("✅ Database initialized")
-            init_users_table()  # <-- moved inside startup after DB init
+            init_users_table()
         else:
             print("📝 Continuing with mock data...")
     except Exception as e:
@@ -84,6 +86,7 @@ async def health_check():
             "auth": "healthy",
             "query": "healthy",
             "timesheet": "healthy",
+            "chatbot": "healthy",
             "files": "healthy",
             "database": "healthy"
         }
