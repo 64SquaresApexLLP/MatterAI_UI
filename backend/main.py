@@ -23,6 +23,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
+        "http://13.203.251.172:5173",
         "http://localhost:5173",
         "http://localhost:3000",
         "http://localhost:5173/timesheet/entries"

@@ -18,8 +18,8 @@ const TimesheetChatbot = ({ user, onClose }) => {
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const recognitionRef = useRef(null);
-//   const API_BASE = 'http://localhost:8000';
-  const API_BASE = 'http://0.0.0.0:8001';
+  const API_BASE = 'http://localhost:8000';
+  // const API_BASE = 'http://0.0.0.0:8001';
 
   // Initialize Speech Recognition (webkit only for Chrome)
   useEffect(() => {

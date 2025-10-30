@@ -1,4 +1,4 @@
-import React, {useState, useRef, useEffect} from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   Send,
   Mic,
@@ -22,17 +22,18 @@ import {
   TrendingUp,
   AlertTriangle,
   Info,
-  Globe
+  Globe,
+  Copy
 } from "lucide-react";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import TimesheetForm from "./TimesheetForm";
 import TimesheetEntries from "./TimesheetEntries";
-import { 
-  useHomeLogic, 
-  notificationHelper, 
-  languages, 
-  formatFileSize 
+import {
+  useHomeLogic,
+  notificationHelper,
+  languages,
+  formatFileSize
 } from "./HomeLogic";
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
@@ -47,6 +48,37 @@ import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
+const jurisdictions = [
+  "European Patent Office (EPO)",
+  "US Patent & Trademark Office (USPTO)",
+  "Japan Patent Office (JPO)",
+  "Korean Intellectual Property Office (KIPO)",
+  "Chinese National Intellectual Property Administration (CNIPA)"
+];
+
+const jurisdictionPrompts = new Map([
+  [
+    "Chinese National Intellectual Property Administration (CNIPA)",
+    "You are an expert Chinese patent translator with extensive experience in CNIPA filing procedures. Your task is to translate a foreign language patent specification into Chinese for filing with the China National Intellectual Property Administration (CNIPA, [translate:中国国家知识产权局]). Your translation must be technically precise, legally sound, and adhere strictly to Chinese patent practice and the conventions of the Chinese Patent Law ([translate:专利法])."
+  ],
+  [
+    "Korean Intellectual Property Office (KIPO)",
+    "You are an expert Korean patent translator (변리사 or patent translator with extensive KIPO experience). Your task is to translate a foreign language patent specification into Korean for filing with the Korean Intellectual Property Office (KIPO). Your translation must be technically precise, legally sound, and adhere strictly to Korean patent practice and conventions."
+  ],
+  [
+    "Japan Patent Office (JPO)",
+    "You are an expert Japanese patent translator (弁理士 or patent translator with extensive JPO experience). Your task is to translate a foreign language patent specification into Japanese for filing with the Japan Patent Office (JPO). Your translation must be technically precise, legally sound, and adhere strictly to Japanese patent practice and conventions."
+  ],
+  [
+    "US Patent & Trademark Office (USPTO)",
+    "You are an expert US patent translator with extensive experience in USPTO filing procedures. Your task is to translate a patent specification into English for filing with the United States Patent and Trademark Office (USPTO). Your translation must be technically precise, legally sound, and adhere strictly to US patent practice and conventions."
+  ],
+  [
+    "European Patent Office (EPO)",
+    "You are an expert European patent translator with extensive experience in EPO filing procedures. Your task is to translate a patent specification into English, French, or German for filing with the European Patent Office (EPO). Your translation must be technically precise, legally sound, and adhere strictly to the conventions of European patent practice under the European Patent Convention (EPC). Produce a filing-ready European patent specification that is a faithful and literal translation of the source text, preserving the exact scope of the invention, particularly in the claims. When translating repeated instances of a word in the source text, the same instance of the translated word should be used unless there is a compelling reason not to, in order to maintain consistent terminology."
+  ]
+]);
+
 const pdfOptions = {
   cMapUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/cmaps/`,
   cMapPacked: true,
@@ -58,21 +90,19 @@ const pdfOptions = {
   verbosity: 1
 };
 
-// Add these helper functions near the top of your Home component
 const containsCJK = (text) => {
   const cjkRegex = /[\u2E80-\u2EFF\u2F00-\u2FDF\u3040-\u309F\u30A0-\u30FF\u3100-\u312F\u3200-\u32FF\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/;
   return cjkRegex.test(text);
 };
 
-// Helper function to detect if PDF might contain CJK based on filename or content
 const isPotentiallyCJK = (filename, targetLanguage = '') => {
   const cjkLanguages = ['chinese', 'japanese', 'korean', 'zh', 'ja', 'ko', 'cn', 'jp', 'kr', '中文', '日本語', '한국어'];
   const lowerFilename = filename.toLowerCase();
   const lowerLanguage = targetLanguage.toLowerCase();
-  return cjkLanguages.some(lang => 
-    lowerFilename.includes(lang) || 
-    lowerLanguage.includes(lang) || 
-    containsCJK(filename) || 
+  return cjkLanguages.some(lang =>
+    lowerFilename.includes(lang) ||
+    lowerLanguage.includes(lang) ||
+    containsCJK(filename) ||
     containsCJK(targetLanguage)
   );
 };
@@ -157,7 +187,7 @@ const Home = ({ user, onBack, onLogout }) => {
     notificationPermission,
     handleRequestNotificationPermission,
     previewFile,
-    previewFileType, 
+    previewFileType,
     toggleListening,
     handleButtonClick,
     handleLanguageSelect,
@@ -180,152 +210,175 @@ const Home = ({ user, onBack, onLogout }) => {
   const [previewUrl, setPreviewUrl] = useState(null);
   const [currentPreviewFileType, setCurrentPreviewFileType] = useState(null);
   const [useCJKMode, setUseCJKMode] = useState(false);
+  const [showJurisdictionDropdown, setShowJurisdictionDropdown] = useState(false);
+
   const docxPreviewRef = useRef(null);
 
+  const [selectedJurisdiction, setSelectedJurisdiction] = useState(null);
+  const [showPromptSection, setShowPromptSection] = useState(true);
+  const [showOptionsSection, setShowOptionsSection] = useState(true);
+
   const [showFileSelector, setShowFileSelector] = useState(false);
+
+  const [showReplacePrompt, setShowReplacePrompt] = useState(false);
+  const [awaitingReplaceResponse, setAwaitingReplaceResponse] = useState(false);
+  const [hasReplacement, setHasReplacement] = useState(false);
+  const [replacementStep, setReplacementStep] = useState(0);
+  const [replacementInput, setReplacementInput] = useState("");
 
   useEffect(() => {
     setShowFileSelector(translationJobs.length > 0);
   }, [translationJobs]);
 
-  // CJK PDF Preview Function
-  // const previewCJKPdf = async (downloadId) => {
-  //   try {
-  //     const response = await fetch(`${import.meta.env.VITE_TRANSLATION_API_URL}/download/${downloadId}`, {
-  //       method: 'GET',
-  //     });
-
-  //     if (response.ok) {
-  //       const blob = await response.blob();
-  //       const url = URL.createObjectURL(blob);
-  //       setPreviewUrl(url);
-  //       setCurrentPreviewFileType('application/pdf');
-  //       setUseCJKMode(true);
-  //     } else {
-  //       console.error('Failed to fetch PDF for CJK preview');
-  //     }
-  //   } catch (err) {
-  //     console.error('CJK PDF Preview fetch error', err);
-  //   }
-  // };
-
-  // Handle preview file loading when a job is selected for preview
   useEffect(() => {
-  const loadPreviewFile = async () => {
-    if (selectedJobForPreview && jobStatuses[selectedJobForPreview]?.status === 'COMPLETED') {
-      const jobStatus = jobStatuses[selectedJobForPreview];
-      const selectedJob = translationJobs.find(job => job.job_id === selectedJobForPreview);
-      
-      if (jobStatus.download_id && selectedJob) {
-        try {
-          // Check if this might be a CJK file
-          const mightBeCJK = isPotentiallyCJK(selectedJob.filename, selectedJob.target_language);
+    const loadPreviewFile = async () => {
+      if (selectedJobForPreview && jobStatuses[selectedJobForPreview]?.status === 'COMPLETED') {
+        const jobStatus = jobStatuses[selectedJobForPreview];
+        const selectedJob = translationJobs.find(job => job.job_id === selectedJobForPreview);
 
-          const response = await fetch(`${import.meta.env.VITE_TRANSLATION_API_URL}/download/${jobStatus.download_id}`, {
-            method: 'GET',
-          });
+        if (jobStatus.download_id && selectedJob) {
+          try {
+            const mightBeCJK = isPotentiallyCJK(selectedJob.filename, selectedJob.target_language);
 
-          if (response.ok) {
-            const contentType = response.headers.get('content-type');
-            
-            if (contentType && contentType.includes('application/pdf')) {
-              if (mightBeCJK) {
-                // 🔥 USE THE IMPORTED FUNCTIONS HERE 🔥
-                await loadNotoCJK(); // Load font first
-                await previewCJKPdf(
-                  jobStatus.download_id,
-                  setPreviewUrl,
-                  setCurrentPreviewFileType,
-                  setUseCJKMode,
-                  setShowPreview
-                );
-                setPreviewingFile(null); // Clear react-pdf preview
-              } else {
-                // Use standard react-pdf preview
+            const response = await fetch(`${import.meta.env.VITE_TRANSLATION_API_URL}/download/${jobStatus.download_id}`, {
+              method: 'GET',
+            });
+
+            if (response.ok) {
+              const contentType = response.headers.get('content-type');
+
+              if (contentType && contentType.includes('application/pdf')) {
+                if (mightBeCJK) {
+                  await loadNotoCJK();
+                  await previewCJKPdf(
+                    jobStatus.download_id,
+                    setPreviewUrl,
+                    setCurrentPreviewFileType,
+                    setUseCJKMode,
+                    setShowPreview
+                  );
+                  setPreviewingFile(null);
+                } else {
+                  const blob = await response.blob();
+                  const blobUrl = URL.createObjectURL(blob);
+                  setPreviewingFile({ file: blobUrl, type: 'pdf', jobId: selectedJobForPreview });
+                  setUseCJKMode(false);
+                  setPreviewUrl(null);
+                  setCurrentPreviewFileType(null);
+                }
+              } else if (contentType && contentType.includes('application/vnd.openxmlformats-officedocument.wordprocessingml.document')) {
                 const blob = await response.blob();
-                const blobUrl = URL.createObjectURL(blob);
-                setPreviewingFile({ file: blobUrl, type: 'pdf', jobId: selectedJobForPreview });
+                setPreviewingFile({ file: blob, type: 'docx', jobId: selectedJobForPreview });
                 setUseCJKMode(false);
                 setPreviewUrl(null);
                 setCurrentPreviewFileType(null);
               }
-            } else if (contentType && contentType.includes('application/vnd.openxmlformats-officedocument.wordprocessingml.document')) {
-              const blob = await response.blob();
-              setPreviewingFile({ file: blob, type: 'docx', jobId: selectedJobForPreview });
-              setUseCJKMode(false);
-              setPreviewUrl(null);
-              setCurrentPreviewFileType(null);
             }
+          } catch (error) {
+            console.error('Error loading preview file:', error);
+            setPreviewingFile(null);
+            setPreviewUrl(null);
+            setCurrentPreviewFileType(null);
+            setUseCJKMode(false);
           }
-        } catch (error) {
-          console.error('Error loading preview file:', error);
-          setPreviewingFile(null);
-          setPreviewUrl(null);
-          setCurrentPreviewFileType(null);
-          setUseCJKMode(false);
         }
       }
+    };
+
+    loadPreviewFile();
+  }, [selectedJobForPreview, jobStatuses, translationJobs]);
+
+  useEffect(() => {
+    if (previewingFile?.file && previewingFile.type === 'docx' && docxPreviewRef.current) {
+      docxPreviewRef.current.innerHTML = '';
+
+      renderAsync(previewingFile.file, docxPreviewRef.current, undefined, {
+        className: 'docx-wrapper',
+        inWrapper: true,
+        ignoreWidth: false,
+        ignoreHeight: false,
+        ignoreFonts: false,
+        breakPages: true,
+        ignoreLastRenderedPageBreak: true,
+        experimental: false,
+        trimXmlDeclaration: true,
+        useBase64URL: false,
+        renderChanges: false,
+        renderHeaders: true,
+        renderFooters: true,
+        renderFootnotes: true,
+        renderEndnotes: true,
+        fontMapping: {
+          'SimSun': 'SimSun, "MS Mincho", "Yu Gothic", "Malgun Gothic", serif',
+          'MS Mincho': 'SimSun, "MS Mincho", "Yu Gothic", serif',
+          'Noto Sans CJK': 'Noto Sans CJK SC, Noto Sans CJK TC, Noto Sans CJK JP, Noto Sans CJK KR, sans-serif',
+          'Arial Unicode MS': 'Arial Unicode MS, "Yu Gothic", "Malgun Gothic", sans-serif',
+          'Malgun Gothic': 'Malgun Gothic, "Yu Gothic", sans-serif'
+        }
+      }).catch(error => {
+        console.error('Error rendering DOCX:', error);
+        docxPreviewRef.current.innerHTML = '<p class="text-red-500 p-4">Error loading document preview</p>';
+      });
+    }
+  }, [previewingFile]);
+
+  const examplePrompt = selectedJurisdiction
+    ? jurisdictionPrompts.get(selectedJurisdiction)
+    : "Please select a jurisdiction to see the appropriate example patent translation prompt.";
+
+  const promptHasReplaceKeyword = query.toLowerCase().includes("replace");
+
+  const handleReplacementSubmit = () => {
+    if (replacementInput.trim()) {
+      setQuery(replacementInput.trim());
+      setHasReplacement(true);
+      setShowReplacePrompt(false);
+      setAwaitingReplaceResponse(false);
+      setReplacementStep(0);
+      setReplacementInput("");
     }
   };
 
-  loadPreviewFile();
-}, [selectedJobForPreview, jobStatuses, translationJobs]);
+  const handleReplaceQuestionResponse = (response) => {
+    if (response === "yes") {
+      setReplacementStep(1);
+      setAwaitingReplaceResponse(false);
+    } else {
+      setHasReplacement(false);
+      setShowReplacePrompt(false);
+      setAwaitingReplaceResponse(false);
+      setReplacementStep(0);
+      setReplacementInput("");
+    }
+  };
 
   useEffect(() => {
-  if (previewingFile?.file && previewingFile.type === 'docx' && docxPreviewRef.current) {
-    docxPreviewRef.current.innerHTML = '';
-    
-    renderAsync(previewingFile.file, docxPreviewRef.current, undefined, {
-      className: 'docx-wrapper',
-      inWrapper: true,
-      ignoreWidth: false,
-      ignoreHeight: false,
-      ignoreFonts: false, // Keep this false to preserve fonts
-      breakPages: true,
-      ignoreLastRenderedPageBreak: true,
-      experimental: false,
-      trimXmlDeclaration: true,
-      useBase64URL: false,
-      renderChanges: false,
-      renderHeaders: true,
-      renderFooters: true,
-      renderFootnotes: true,
-      renderEndnotes: true,
-      fontMapping: {
-        'SimSun': 'SimSun, "MS Mincho", "Yu Gothic", "Malgun Gothic", serif',
-        'MS Mincho': 'SimSun, "MS Mincho", "Yu Gothic", serif', 
-        'Noto Sans CJK': 'Noto Sans CJK SC, Noto Sans CJK TC, Noto Sans CJK JP, Noto Sans CJK KR, sans-serif',
-        'Arial Unicode MS': 'Arial Unicode MS, "Yu Gothic", "Malgun Gothic", sans-serif',
-        'Malgun Gothic': 'Malgun Gothic, "Yu Gothic", sans-serif'
+    if (selectedButton === "Translation" && query.trim() && !promptHasReplaceKeyword && !hasReplacement) {
+      setShowReplacePrompt(true);
+      setAwaitingReplaceResponse(true);
+      setReplacementStep(0);
+    } else {
+      if (!hasReplacement) {
+        setShowReplacePrompt(false);
       }
-    }).catch(error => {
-      console.error('Error rendering DOCX:', error);
-      docxPreviewRef.current.innerHTML = '<p class="text-red-500 p-4">Error loading document preview</p>';
-    });
-  }
-}, [previewingFile]);
+    }
+  }, [query, selectedButton, promptHasReplaceKeyword, hasReplacement]);
 
-  // Add this useEffect to debug
-  useEffect(() => {
-  console.log('Translation Jobs:', translationJobs);
-  console.log('Job Statuses:', jobStatuses);
-  console.log('Evaluation Data:', evaluationData);
-  }, [translationJobs, jobStatuses, evaluationData]);
+  const showTranslateButtonFinal = hasReplacement || promptHasReplaceKeyword || !showReplacePrompt;
 
   const handleClosePreview = () => {
     setShowPreview(false);
     setPageNumber(1);
     setSelectedJobForPreview(null);
-    
-    // Clean up blob URLs
+
     if (previewingFile?.file && typeof previewingFile.file === 'string' && previewingFile.file.startsWith('blob:')) {
       URL.revokeObjectURL(previewingFile.file);
     }
-    
+
     if (previewUrl && previewUrl.startsWith('blob:')) {
       URL.revokeObjectURL(previewUrl);
     }
-    
+
     setPreviewingFile(null);
     setPreviewUrl(null);
     setCurrentPreviewFileType(null);
@@ -352,7 +405,6 @@ const Home = ({ user, onBack, onLogout }) => {
     }));
   };
 
-  // Group jobs by filename
   const groupJobsByFilename = () => {
     const grouped = {};
     translationJobs.forEach(job => {
@@ -366,7 +418,6 @@ const Home = ({ user, onBack, onLogout }) => {
 
   const groupedJobs = groupJobsByFilename();
 
-  // Helper to detect if single file + multiple languages
   const detectMultiLanguageMode = () => {
     if (uploadedFiles.length === 1 && query.trim()) {
       const lowerQuery = query.toLowerCase();
@@ -378,6 +429,12 @@ const Home = ({ user, onBack, onLogout }) => {
   };
 
   const isMultiLanguageMode = detectMultiLanguageMode();
+
+  useEffect(() => {
+    console.log('Translation Jobs:', translationJobs);
+    console.log('Job Statuses:', jobStatuses);
+    console.log('Evaluation Data:', evaluationData);
+  }, [translationJobs, jobStatuses, evaluationData]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-[#062e69] to-slate-800 flex relative overflow-hidden">
@@ -394,7 +451,6 @@ const Home = ({ user, onBack, onLogout }) => {
         theme="light"
       />
 
-      {/* Notification Permission Button */}
       {notificationHelper.isSupported() && notificationPermission !== "granted" && (
         <div className="fixed top-20 right-4 z-50">
           <button
@@ -408,16 +464,16 @@ const Home = ({ user, onBack, onLogout }) => {
         </div>
       )}
 
-      {/* Notification Status Indicator */}
       {notificationHelper.isSupported() && (
         <div className="fixed bottom-4 left-4 z-50">
-          <div className={`flex items-center gap-2 px-3 py-2 rounded-lg shadow-md text-sm ${
-            notificationPermission === "granted" 
-              ? "bg-green-100 text-green-800" 
-              : notificationPermission === "denied"
-              ? "bg-red-100 text-red-800"
-              : "bg-gray-100 text-gray-800"
-          }`}>
+          <div
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg shadow-md text-sm ${notificationPermission === "granted"
+                ? "bg-green-100 text-green-800"
+                : notificationPermission === "denied"
+                  ? "bg-red-100 text-red-800"
+                  : "bg-gray-100 text-gray-800"
+              }`}
+          >
             {notificationPermission === "granted" ? (
               <>
                 <Bell className="w-4 h-4" />
@@ -438,17 +494,15 @@ const Home = ({ user, onBack, onLogout }) => {
         </div>
       )}
 
-      {/* Animated background elements */}
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-[#062e69]/20 rounded-full blur-3xl animate-pulse"></div>
         <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-[#062e69]/15 rounded-full blur-3xl animate-pulse delay-1000"></div>
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-[#062e69]/10 rounded-full blur-2xl animate-ping"></div>
       </div>
 
-      {/* Header with user info and logout */}
       <div className="absolute top-4 left-4 z-20">
-        <button 
-          className="flex items-center space-x-4 rounded-xl px-4 py-2 text-white hover:bg-white/10 transition-colors" 
+        <button
+          className="flex items-center space-x-4 rounded-xl px-4 py-2 text-white hover:bg-white/10 transition-colors"
           onClick={onBack}
         >
           ← Back to Chatbot Selection
@@ -472,31 +526,25 @@ const Home = ({ user, onBack, onLogout }) => {
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className={`flex-1 p-6 transition-all duration-300 ${showPreview ? 'pr-2' : ''}`}>
-        <div className={`relative z-10 w-full mx-auto transition-all duration-300 ${showPreview ? 'max-w-3xl' : 'max-w-4xl'}`}>
-          {/* Logo and Title */}
+      <div className={`flex-1 p-6 transition-all duration-300 max-h-screen overflow-y-auto ${showPreview ? "pr-2" : ""}`}>
+        <div className={`relative z-10 w-full mx-auto transition-all duration-300 ${showPreview ? "max-w-3xl" : "max-w-5xl"}`}>
           <div className="text-center mb-12 animate-fade-in pt-16">
             <div className="flex justify-center items-center mb-6">
               <div className="flex items-center space-x-2">
                 <img src={"./logo.png"} className="w-[20vw]" alt="Logo" />
               </div>
             </div>
-            <h1 className="text-4xl md:text-5xl font-light text-white mb-2 animate-slide-up">
-              How can our AI assist you?
-            </h1>
+            <h1 className="text-4xl md:text-5xl font-light text-white mb-2 animate-slide-up">How can our AI assist you?</h1>
           </div>
 
-          {/* Search Form */}
-          <div className="mb-8 animate-slide-up delay-200">
+          <div className="mb-4 animate-slide-up delay-200">
             <div className="relative group">
               <div className="absolute inset-0 bg-gradient-to-r from-[#062e69]/25 to-white/20 rounded-2xl blur-xl group-hover:blur-2xl transition-all duration-300"></div>
               <div
-                className={`relative bg-white/95 backdrop-blur-xl border rounded-2xl p-4 flex items-center space-x-4 transition-all duration-300 ${
-                  isDragOver
+                className={`relative bg-white/95 backdrop-blur-xl border rounded-2xl p-4 flex items-center space-x-4 transition-all duration-300 ${isDragOver
                     ? "border-[#062e69]/70 bg-white shadow-xl"
                     : "border-[#062e69]/30 hover:border-[#062e69]/50 shadow-lg"
-                }`}
+                  }`}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
@@ -512,55 +560,93 @@ const Home = ({ user, onBack, onLogout }) => {
                   type="text"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder={selectedButton === "Translation" 
-                  ? "Enter translation instructions (e.g., 'Translate to Spanish, French, and German') or select language..." 
-                  : "Case related questions..."}
+                  placeholder={
+                    selectedButton === "Translation"
+                      ? "Enter translation instructions (e.g., 'Translate to Spanish, French, and German') or select language..."
+                      : "Case related questions..."
+                  }
                   className="flex-1 bg-transparent text-[#062e69] placeholder-[#062e69]/50 focus:outline-none text-lg font-medium"
+                  disabled={replacementStep === 1}
                 />
 
-                {/* Language Selection Button - Only show when Translation is selected */}
                 {selectedButton === "Translation" && (
-                  <div className="relative flex-shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => setShowLanguageDropdown(!showLanguageDropdown)}
-                      className="flex-shrink-0 p-2 text-[#062e69]/70 hover:text-[#062e69] transition-colors duration-200 hover:bg-[#062e69]/10 rounded-lg flex items-center space-x-1"
-                      title="Select Language"
-                    >
-                      <Languages className="w-5 h-5" />
-                      {selectedLanguage && (
-                        <span className="text-sm font-medium max-w-20 truncate">
-                          {selectedLanguage.split(" ")[0]}
-                        </span>
-                      )}
-                      {!selectedLanguage && (
-                        <span className="text-sm text-[#062e69]/50">Select (Optional)</span>
-                      )}
-                    </button>
-
-                    {/* Language Dropdown */}
-                    {showLanguageDropdown && (
-                      <div className="absolute bottom-full right-0 mb-2 w-48 bg-white/95 backdrop-blur-xl border border-[#062e69]/30 rounded-xl shadow-xl z-30 max-h-60 overflow-y-auto">
-                        <div className="p-2">
-                          <div className="text-[#062e69] font-medium text-sm mb-2 px-2">
-                            Select Language
+                  <div className="relative flex mr-1">
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setShowLanguageDropdown(!showLanguageDropdown)}
+                        className="p-2 text-[#062e69]/70 hover:text-[#062e69] transition-colors duration-200 hover:bg-[#062e69]/10 rounded-lg flex items-center space-x-1"
+                        title="Select Language"
+                        disabled={awaitingReplaceResponse || replacementStep === 1}
+                      >
+                        <Languages className="w-5 h-5" />
+                        {selectedLanguage ? (
+                          <span className="text-sm font-medium max-w-20 truncate">{selectedLanguage.split(" ")[0]}</span>
+                        ) : (
+                          <span className="text-sm text-[#062e69]/50">Language</span>
+                        )}
+                      </button>
+                      {showLanguageDropdown && !awaitingReplaceResponse && !replacementStep && (
+                        <div className="absolute bottom-full right-0 mb-2 w-48 bg-white/95 backdrop-blur-xl border border-[#062e69]/30 rounded-xl shadow-xl z-30 max-h-60 overflow-y-auto">
+                          <div className="p-2">
+                            <div className="text-[#062e69] font-medium text-sm mb-2 px-2">Select Language</div>
+                            {languages.map((language) => (
+                              <button
+                                key={language}
+                                onClick={() => {
+                                  handleLanguageSelect(language);
+                                  setShowLanguageDropdown(false);
+                                }}
+                                className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-all duration-200 ${selectedLanguage === language
+                                    ? "bg-[#062e69] text-white"
+                                    : "text-[#062e69] hover:bg-[#062e69]/10"
+                                  }`}
+                              >
+                                {language}
+                              </button>
+                            ))}
                           </div>
-                          {languages.map((language) => (
-                            <button
-                              key={language}
-                              onClick={() => handleLanguageSelect(language)}
-                              className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-all duration-200 ${
-                                selectedLanguage === language
-                                  ? "bg-[#062e69] text-white"
-                                  : "text-[#062e69] hover:bg-[#062e69]/10"
-                              }`}
-                            >
-                              {language}
-                            </button>
-                          ))}
                         </div>
-                      </div>
-                    )}
+                      )}
+                    </div>
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setShowJurisdictionDropdown((prev) => !prev)}
+                        className="p-2 text-[#062e69]/70 hover:text-[#062e69] transition-colors duration-200 hover:bg-[#062e69]/10 rounded-lg flex items-center space-x-1"
+                        title="Select Jurisdiction"
+                        disabled={awaitingReplaceResponse || replacementStep === 1}
+                      >
+                        <Globe className="w-5 h-5" />
+                        {selectedJurisdiction ? (
+                          <span className="text-sm font-medium max-w-24 truncate">{selectedJurisdiction}</span>
+                        ) : (
+                          <span className="text-sm text-[#062e69]/50">Jurisdiction</span>
+                        )}
+                      </button>
+                      {showJurisdictionDropdown && !awaitingReplaceResponse && !replacementStep && (
+                        <div className="absolute bottom-full right-0 mb-2 w-48 bg-white/95 backdrop-blur-xl border border-[#062e69]/30 rounded-xl shadow-xl z-30 max-h-60 overflow-y-auto">
+                          <div className="p-2">
+                            <div className="text-[#062e69] font-medium text-sm mb-2 px-2">Select Jurisdiction</div>
+                            {jurisdictions.map((jurisdiction) => (
+                              <button
+                                key={jurisdiction}
+                                onClick={() => {
+                                  setSelectedJurisdiction(jurisdiction);
+                                  setShowJurisdictionDropdown(false);
+                                }}
+                                className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-all duration-200 ${selectedJurisdiction === jurisdiction
+                                    ? "bg-[#062e69] text-white"
+                                    : "text-[#062e69] hover:bg-[#062e69]/10"
+                                  }`}
+                              >
+                                {jurisdiction}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
 
@@ -571,12 +657,14 @@ const Home = ({ user, onBack, onLogout }) => {
                   multiple={!isMultiLanguageMode}
                   accept={selectedButton === "Translation" ? ".pdf,.docx,.pptx" : ".pdf,.doc,.docx,.txt,.xls,.xlsx"}
                   className="hidden"
+                  disabled={replacementStep === 1}
                 />
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="flex-shrink-0 p-2 text-[#062e69]/70 hover:text-[#062e69] transition-colors duration-200 hover:bg-[#062e69]/10 rounded-lg"
+                  className="flex-shrink-0 m-0 p-2 text-[#062e69]/70 hover:text-[#062e69] transition-colors duration-200 hover:bg-[#062e69]/10 rounded-lg"
                   title={selectedButton === "Translation" ? "Upload files (PDF, DOCX, PPTX only)" : "Upload files"}
+                  disabled={replacementStep === 1}
                 >
                   <Paperclip className="w-5 h-5" />
                 </button>
@@ -584,38 +672,39 @@ const Home = ({ user, onBack, onLogout }) => {
                 <button
                   type="button"
                   onClick={toggleListening}
-                  className={`flex-shrink-0 p-2 rounded-lg transition-all duration-200 ${
-                    isListening
-                      ? "text-red-500 bg-red-500/20 animate-pulse"
-                      : "text-[#062e69]/70 hover:text-[#062e69] hover:bg-[#062e69]/10"
-                  }`}
+                  className={`flex-shrink-0 mr-2 p-2 rounded-lg transition-all duration-200 ${isListening ? "text-red-500 bg-red-500/20 animate-pulse" : "text-[#062e69]/70 hover:text-[#062e69] hover:bg-[#062e69]/10"
+                    }`}
                   title={isListening ? "Stop Listening" : "Start Listening"}
+                  disabled={replacementStep === 1}
                 >
                   <Mic className="w-5 h-5" />
                 </button>
 
-                <button
-                  onClick={handleSubmit}
-                  disabled={isTranslating}
-                  className="flex-shrink-0 bg-gradient-to-r from-[#062e69] to-[#062e69]/80 hover:from-[#062e69]/90 hover:to-[#062e69] text-white px-6 py-2 rounded-xl font-medium transition-all duration-200 transform hover:scale-105 hover:shadow-lg hover:shadow-[#062e69]/25 flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-                >
-                  {isTranslating ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Processing...</span>
-                    </>
-                  ) : selectedButton === "Translation" ? (
-                    <>
-                      <span>Translate</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>Ask</span>
-                      <Send className="w-4 h-4" />
-                    </>
-                  )}
-                </button>
+                {showTranslateButtonFinal && (
+                  <button
+                    onClick={handleSubmit}
+                    disabled={isTranslating}
+                    className="flex-shrink-0 bg-gradient-to-r from-[#062e69] to-[#062e69]/80 hover:from-[#062e69]/90 hover:to-[#062e69] text-white px-3 py-2 rounded-xl font-medium transition-all duration-200 transform hover:scale-105 hover:shadow-lg hover:shadow-[#062e69]/25 flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                  >
+                    {isTranslating ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Processing...</span>
+                      </>
+                    ) : selectedButton === "Translation" ? (
+                      <>
+                        <span>Translate</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Ask</span>
+                        <Send className="w-4 h-4" />
+                      </>
+                    )}
+                  </button>
+                )}
               </div>
+
               {isDragOver && (
                 <div className="absolute inset-0 bg-[#062e69]/10 backdrop-blur-sm rounded-2xl border-2 border-dashed border-[#062e69]/50 flex items-center justify-center z-10">
                   <div className="text-[#062e69] font-medium flex items-center space-x-2">
@@ -625,43 +714,113 @@ const Home = ({ user, onBack, onLogout }) => {
                 </div>
               )}
             </div>
+
+            {!showTranslateButtonFinal && showReplacePrompt && (
+              <div className="mt-2 flex items-center space-x-4 bg-yellow-50 border border-yellow-300 rounded-lg p-3 text-yellow-900 max-w-5xl">
+                {awaitingReplaceResponse ? (
+                  <>
+                    <span>Do you want any word to be replaced with another word?</span>
+                    <button
+                      onClick={() => handleReplaceQuestionResponse("yes")}
+                      className="px-3 py-1 bg-yellow-400 hover:bg-yellow-500 text-white rounded-md"
+                    >
+                      Yes
+                    </button>
+                    <button
+                      onClick={() => handleReplaceQuestionResponse("no")}
+                      className="px-3 py-1 bg-yellow-300 hover:bg-yellow-400 text-yellow-900 rounded-md"
+                    >
+                      No
+                    </button>
+                  </>
+                ) : replacementStep === 1 ? (
+                  <>
+                    <input
+                      type="text"
+                      value={replacementInput}
+                      onChange={(e) => setReplacementInput(e.target.value)}
+                      placeholder="Enter new prompt with replacements"
+                      className="flex-1 p-2 border border-yellow-400 rounded-md focus:outline-none"
+                    />
+                    <button
+                      onClick={handleReplacementSubmit}
+                      disabled={!replacementInput.trim()}
+                      className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-md disabled:opacity-50"
+                    >
+                      Submit
+                    </button>
+                    <button
+                      onClick={() => {
+                        setReplacementStep(0);
+                        setAwaitingReplaceResponse(true);
+                        setReplacementInput("");
+                      }}
+                      className="px-4 py-2 bg-yellow-300 hover:bg-yellow-400 text-yellow-900 rounded-md"
+                    >
+                      Cancel
+                    </button>
+                  </>
+                ) : null}
+              </div>
+            )}
           </div>
 
-          {/* Multi-Language Mode Indicator */}
           {selectedButton === "Translation" && isMultiLanguageMode && (
             <div className="mb-4 p-3 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg animate-slide-up">
               <div className="flex items-center space-x-2">
                 <Globe className="w-5 h-5 text-blue-600" />
                 <div className="flex-1">
-                  <p className="text-sm font-semibold text-blue-900">
-                    🌍 Multi-Language Mode Active
-                  </p>
-                  <p className="text-xs text-blue-700 mt-0.5">
-                    Your file will be translated to multiple languages based on your prompt
-                  </p>
+                  <p className="text-sm font-semibold text-blue-900">🌍 Multi-Language Mode Active</p>
+                  <p className="text-xs text-blue-700 mt-0.5">Your file will be translated to multiple languages based on your prompt</p>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Help Text */}
           {selectedButton === "Translation" && (
             <div className="mb-2 text-xs text-white/70 text-center bg-white/10 backdrop-blur-sm rounded-lg p-3 border border-white/20">
-              <div className="space-y-1">
-                <div className="flex items-center justify-center space-x-2">
-                  <Languages className="w-4 h-4" />
-                  <strong>Translation Options:</strong>
+              <div className="flex items-center justify-between mb-1 cursor-pointer" onClick={() => setShowPromptSection((prev) => !prev)}>
+                <div className="flex items-center gap-2">
+                  <Info className="w-4 h-4 text-white-600" />
+                  <span className="font-semibold text-white">Example Prompt for {selectedJurisdiction || "Patent Translation"}</span>
                 </div>
-                <p>
-                  📋 <strong>Single Language:</strong> Select language dropdown OR type "Translate to Spanish"
-                </p>
-                <p>
-                  🌐 <strong>Multiple Languages:</strong> Upload 1 file + type "Translate to German, French, and Spanish"
-                </p>
-                <p>
-                  📚 <strong>Multiple Files:</strong> Upload multiple files + select one language
-                </p>
+                <span className="text-white select-none">{showPromptSection ? "−" : "+"}</span>
               </div>
+              {showPromptSection && (
+                <div className="text-white-800 text-sm flex justify-between items-center">
+                  <div className="whitespace-pre-wrap text-left max-w-[85%]">{examplePrompt}</div>
+                  <button
+                    className="text-white hover:text-blue-400 p-1"
+                    onClick={() => {
+                      navigator.clipboard
+                        .writeText(examplePrompt)
+                        .then(() => alert("Text copied to clipboard!"))
+                        .catch((err) => alert("Failed to copy text: " + err));
+                    }}
+                  >
+                    <Copy className="w-5 h-5" />
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {selectedButton === "Translation" && (
+            <div className="mt-2 mb-4 text-xs text-white/70 text-center bg-white/10 backdrop-blur-sm rounded-lg p-3 border border-white/20">
+              <div className="flex items-center justify-between mb-1 cursor-pointer" onClick={() => setShowOptionsSection((prev) => !prev)}>
+                <div className="flex items-center space-x-2">
+                  <Languages className="w-4 h-4" />
+                  <strong>Translation Options</strong>
+                </div>
+                <span className="select-none">{showOptionsSection ? "−" : "+"}</span>
+              </div>
+              {showOptionsSection && (
+                <div className="space-y-1 text-left">
+                  <p>📋 <strong>Single Language:</strong> Select language dropdown OR type "Translate to Spanish"</p>
+                  <p>🌐 <strong>Multiple Languages:</strong> Upload 1 file + type "Translate to German, French, and Spanish"</p>
+                  <p>📚 <strong>Multiple Files:</strong> Upload multiple files + select one language</p>
+                </div>
+              )}
             </div>
           )}
 
@@ -680,7 +839,6 @@ const Home = ({ user, onBack, onLogout }) => {
             </div>
           )}
 
-          {/* Uploaded Files Display */}
           {uploadedFiles.length > 0 && (
             <div className="mb-8 animate-slide-up delay-300">
               <div className="bg-white/90 backdrop-blur-xl border border-[#062e69]/30 rounded-2xl p-4 shadow-lg">
@@ -733,7 +891,6 @@ const Home = ({ user, onBack, onLogout }) => {
             </div>
           )}
 
-          {/* Translation Jobs Status Display - Grouped by Filename */}
           {translationJobs.length > 0 && (
             <div className="mb-8 animate-slide-up delay-500">
               <div className="bg-white/90 backdrop-blur-xl border border-[#062e69]/30 rounded-2xl p-4 shadow-lg">
@@ -753,7 +910,7 @@ const Home = ({ user, onBack, onLogout }) => {
                     <span>Download All Completed</span>
                   </button>
                 </div>
-                
+
                 <div className="space-y-4">
                   {Object.entries(groupedJobs).map(([filename, jobs]) => (
                     <div key={filename} className="border border-[#062e69]/20 rounded-xl p-4 bg-[#062e69]/5">
@@ -764,12 +921,12 @@ const Home = ({ user, onBack, onLogout }) => {
                           ({jobs.length} translation{jobs.length > 1 ? 's' : ''} - {jobs.map(j => j.target_language).join(', ')})
                         </span>
                       </div>
-                      
+
                       <div className="space-y-2">
                         {jobs.map((job) => {
                           const status = jobStatuses[job.job_id];
                           const evaluation = evaluationData[job.job_id];
-                          
+
                           return (
                             <div
                               key={job.job_id}
@@ -796,15 +953,13 @@ const Home = ({ user, onBack, onLogout }) => {
                                     )}
                                   </div>
                                 </div>
-                                
+
                                 <div className="flex items-center space-x-2">
-                                  {/* Status */}
                                   <div className={`px-2 py-1 rounded-full text-xs font-medium border flex items-center space-x-1 ${getStatusColor(status?.status || 'PENDING')}`}>
                                     {getStatusIcon(status?.status || 'PENDING')}
                                     <span>{status?.status || 'PENDING'}</span>
                                   </div>
-                                  
-                                  {/* Evaluation Info Button */}
+
                                   {evaluation && status?.status === 'COMPLETED' && (
                                     <button
                                       onClick={() => toggleEvaluationDetails(job.job_id)}
@@ -814,8 +969,7 @@ const Home = ({ user, onBack, onLogout }) => {
                                       <Info className="w-4 h-4" />
                                     </button>
                                   )}
-                                  
-                                  {/* Preview Button */}
+
                                   {status?.status === 'COMPLETED' && (
                                     <button
                                       onClick={() => {
@@ -828,8 +982,7 @@ const Home = ({ user, onBack, onLogout }) => {
                                       <Eye className="w-4 h-4" />
                                     </button>
                                   )}
-                                  
-                                  {/* Download Button */}
+
                                   {status?.status === 'COMPLETED' && (
                                     <button
                                       onClick={() => handleDownload(job.job_id)}
@@ -841,8 +994,7 @@ const Home = ({ user, onBack, onLogout }) => {
                                   )}
                                 </div>
                               </div>
-                              
-                              {/* Evaluation Details Expandable Section */}
+
                               {evaluation && showEvaluationDetails[job.job_id] && (
                                 <div className="mt-3 pt-3 border-t border-[#062e69]/10">
                                   <div className="space-y-2 text-sm">
@@ -850,12 +1002,12 @@ const Home = ({ user, onBack, onLogout }) => {
                                       <span className="text-[#062e69]/70">Source Language:</span>
                                       <span className="font-medium text-[#062e69]">{evaluation.source_language || 'N/A'}</span>
                                     </div>
-                                    
+
                                     <div className="flex items-center justify-between">
                                       <span className="text-[#062e69]/70">Evaluation Method:</span>
                                       <span className="font-medium text-[#062e69] text-xs">{evaluation.evaluation_method || 'N/A'}</span>
                                     </div>
-                                    
+
                                     {evaluation.detailed_analysis && (
                                       <>
                                         {evaluation.detailed_analysis.strengths && evaluation.detailed_analysis.strengths.length > 0 && (
@@ -871,7 +1023,7 @@ const Home = ({ user, onBack, onLogout }) => {
                                             </ul>
                                           </div>
                                         )}
-                                        
+
                                         {evaluation.detailed_analysis.improvement_areas && evaluation.detailed_analysis.improvement_areas.length > 0 && (
                                           <div className="mt-2">
                                             <div className="text-[#062e69]/70 font-medium mb-1 flex items-center space-x-1">
@@ -885,7 +1037,7 @@ const Home = ({ user, onBack, onLogout }) => {
                                             </ul>
                                           </div>
                                         )}
-                                        
+
                                         {evaluation.detailed_analysis.overall_assessment && (
                                           <div className="mt-2">
                                             <div className="text-[#062e69]/70 font-medium mb-1">Overall Assessment:</div>
@@ -896,7 +1048,7 @@ const Home = ({ user, onBack, onLogout }) => {
                                         )}
                                       </>
                                     )}
-                                    
+
                                     {evaluation.error && (
                                       <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">
                                         <strong>Evaluation Error:</strong> {evaluation.error}
@@ -916,15 +1068,13 @@ const Home = ({ user, onBack, onLogout }) => {
             </div>
           )}
 
-          {/* Action Buttons */}
           <div className="flex flex-wrap justify-center gap-4 animate-slide-up delay-400">
             <button
               onClick={() => handleButtonClick("Translation")}
-              className={`group relative backdrop-blur-xl border font-medium transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-[#062e69]/25 px-6 py-3 rounded-xl ${
-                selectedButton === "Translation"
+              className={`group relative backdrop-blur-xl border font-medium transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-[#062e69]/25 px-6 py-3 rounded-xl ${selectedButton === "Translation"
                   ? "bg-blue-900 text-white border-[#062e69] shadow-lg"
                   : "bg-white/90 border-[#062e69]/30 hover:border-[#062e69]/50 text-[#062e69]"
-              }`}
+                }`}
             >
               <Languages className="w-4 h-4 inline-block mr-2" />
               Translation
@@ -932,39 +1082,35 @@ const Home = ({ user, onBack, onLogout }) => {
 
             <button
               onClick={() => handleButtonClick("Timesheet")}
-              className={`group backdrop-blur-xl border font-medium transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-[#062e69]/25 px-6 py-3 rounded-xl ${
-                selectedButton === "Timesheet"
+              className={`group backdrop-blur-xl border font-medium transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-[#062e69]/25 px-6 py-3 rounded-xl ${selectedButton === "Timesheet"
                   ? "bg-blue-900 text-white border-[#062e69] shadow-lg"
                   : "bg-white/90 border-[#062e69]/30 hover:border-[#062e69]/50 text-[#062e69]"
-              }`}
+                }`}
             >
               Timesheet
             </button>
 
             <button
               onClick={() => handleButtonClick("Matters")}
-              className={`group backdrop-blur-xl border font-medium transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-[#062e69]/25 px-6 py-3 rounded-xl ${
-                selectedButton === "Matters"
+              className={`group backdrop-blur-xl border font-medium transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-[#062e69]/25 px-6 py-3 rounded-xl ${selectedButton === "Matters"
                   ? "bg-blue-900 text-white border-[#062e69] shadow-lg"
                   : "bg-white/90 border-[#062e69]/30 hover:border-[#062e69]/50 text-[#062e69]"
-              }`}
+                }`}
             >
               Matters
             </button>
 
             <button
               onClick={() => handleButtonClick("Entries")}
-              className={`group backdrop-blur-xl border font-medium transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-[#062e69]/25 px-6 py-3 rounded-xl ${
-                selectedButton === "Entries"
+              className={`group backdrop-blur-xl border font-medium transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-[#062e69]/25 px-6 py-3 rounded-xl ${selectedButton === "Entries"
                   ? "bg-blue-900 text-white border-[#062e69] shadow-lg"
                   : "bg-white/90 border-[#062e69]/30 hover:border-[#062e69]/50 text-[#062e69]"
-              }`}
+                }`}
             >
               Entries
             </button>
           </div>
 
-          {/* Text Translation Result */}
           {textTranslationResult && (
             <div className="mt-8 animate-slide-up delay-500">
               <div className="bg-white/90 backdrop-blur-xl border border-[#062e69]/30 rounded-2xl p-6 shadow-lg">
@@ -982,7 +1128,7 @@ const Home = ({ user, onBack, onLogout }) => {
                     <X className="w-5 h-5" />
                   </button>
                 </div>
-                
+
                 <div className="space-y-4">
                   <div>
                     <label className="text-sm font-medium text-[#062e69]/70 mb-2 block">
@@ -992,7 +1138,7 @@ const Home = ({ user, onBack, onLogout }) => {
                       {query}
                     </p>
                   </div>
-                  
+
                   <div>
                     <label className="text-sm font-medium text-[#062e69]/70 mb-2 block">
                       Translated Text ({selectedLanguage}):
@@ -1001,7 +1147,7 @@ const Home = ({ user, onBack, onLogout }) => {
                       {textTranslationResult.translated_text}
                     </p>
                   </div>
-                  
+
                   {textTranslationResult.message && (
                     <div className="text-sm text-green-600 flex items-center space-x-2">
                       <CheckCircle className="w-4 h-4" />
@@ -1013,11 +1159,10 @@ const Home = ({ user, onBack, onLogout }) => {
             </div>
           )}
 
-          {/* Timesheet Form */}
           {showTimesheet && (
             <div className="mt-8 animate-fade-in">
               <TimesheetOptions
-              user={user}
+                user={user}
                 onClose={() => {
                   setShowTimesheet(false);
                 }}
@@ -1025,7 +1170,6 @@ const Home = ({ user, onBack, onLogout }) => {
             </div>
           )}
 
-          {/* Timesheet Entries */}
           {showEntries && (
             <div className="mt-8 animate-fade-in">
               <TimesheetEntries
@@ -1038,11 +1182,9 @@ const Home = ({ user, onBack, onLogout }) => {
         </div>
       </div>
 
-      {/* Preview Panel */}
       {showPreview && (
         <div className="w-1/2 p-2 bg-white/5 backdrop-blur-sm border-l border-white/10 animate-slide-in-right overflow-y-auto max-h-screen">
           <div className="h-full bg-white/95 backdrop-blur-xl border border-[#062e69]/30 rounded-2xl shadow-lg flex flex-col overflow-y-auto max-h-screen">
-            {/* Preview Header */}
             <div className="flex items-center justify-between p-4 border-b border-[#062e69]/10">
               <div className="flex items-center space-x-2">
                 <button
@@ -1057,14 +1199,12 @@ const Home = ({ user, onBack, onLogout }) => {
                   Translation Preview
                 </h3>
 
-                {/* CJK Mode Indicator */}
                 {useCJKMode && (
                   <div className="ml-4 px-3 py-1 bg-blue-100 text-blue-800 text-xs rounded-full border border-blue-300">
                     🌏 CJK Mode
                   </div>
                 )}
 
-                {/* Show accuracy for selected job */}
                 {selectedJobForPreview && evaluationData[selectedJobForPreview] && evaluationData[selectedJobForPreview].combined_accuracy !== undefined && (
                   <div className={`ml-4 px-3 py-1 rounded-full text-sm font-medium border flex items-center space-x-1 ${getAccuracyColor(evaluationData[selectedJobForPreview].combined_accuracy)}`}>
                     <TrendingUp className="w-4 h-4" />
@@ -1079,8 +1219,6 @@ const Home = ({ user, onBack, onLogout }) => {
                 <X className="w-5 h-5" />
               </button>
             </div>
-
-            {/* File Selection */}
             {translationJobs.length > 0 && (
               <div className="p-4 border-b border-[#062e69]/10">
                 <label className="text-sm font-medium text-[#062e69]/70 mb-2 block">
@@ -1105,7 +1243,6 @@ const Home = ({ user, onBack, onLogout }) => {
                     })}
                 </select>
 
-                {/* Show evaluation summary for selected job */}
                 {selectedJobForPreview && evaluationData[selectedJobForPreview] && !evaluationData[selectedJobForPreview].error && (
                   <div className="mt-3 p-3 bg-[#062e69]/5 rounded-lg border border-[#062e69]/10">
                     <div className="text-xs space-y-1">
@@ -1134,9 +1271,7 @@ const Home = ({ user, onBack, onLogout }) => {
               </div>
             )}
 
-            {/* Preview Content */}
             <div className="flex-1 p-4 overflow-y-auto">
-              {/* CJK PDF Preview using iframe */}
               {useCJKMode && previewUrl && currentPreviewFileType === 'application/pdf' ? (
                 <iframe
                   src={previewUrl}
@@ -1144,107 +1279,105 @@ const Home = ({ user, onBack, onLogout }) => {
                   className="w-full h-full border-0 rounded-lg shadow-lg"
                   style={{ minHeight: '600px' }}
                 />
-              ) : 
-              /* Standard PDF Preview using react-pdf */
-              previewingFile && previewingFile.type === 'pdf' ? (
-                <div className="flex flex-col items-center">
-                  <Document
-                    options={pdfOptions}
-                    file={previewingFile.file}
-                    onLoadSuccess={onDocumentLoadSuccess}
-                    loading={
-                      <div className="flex items-center justify-center p-8">
-                        <Loader2 className="w-8 h-8 animate-spin text-[#062e69]" />
-                      </div>
-                    }
-                    error={
-                      <div className="text-red-500 p-4 text-center">
-                        <p className="mb-2">Error loading PDF preview.</p>
-                        <p className="text-sm text-gray-600">
-                          The translated file is still available for download below.
-                        </p>
-                      </div>
-                    }
-                    onLoadError={(error) => {
-                      console.error('PDF load error:', error);
-                      if (error.message.includes('font') || error.message.includes('character')) {
-                      console.warn('Possible CJK font issue detected');
+              ) :
+                previewingFile && previewingFile.type === 'pdf' ? (
+                  <div className="flex flex-col items-center">
+                    <Document
+                      options={pdfOptions}
+                      file={previewingFile.file}
+                      onLoadSuccess={onDocumentLoadSuccess}
+                      loading={
+                        <div className="flex items-center justify-center p-8">
+                          <Loader2 className="w-8 h-8 animate-spin text-[#062e69]" />
+                        </div>
                       }
-                    }}
-                  >
-                    <Page
-                      pageNumber={pageNumber}
-                      renderTextLayer={true}
-                      renderAnnotationLayer={true}
-                      className="shadow-lg"
-                      width={Math.min(window.innerWidth * 0.4, 800)}
+                      error={
+                        <div className="text-red-500 p-4 text-center">
+                          <p className="mb-2">Error loading PDF preview.</p>
+                          <p className="text-sm text-gray-600">
+                            The translated file is still available for download below.
+                          </p>
+                        </div>
+                      }
                       onLoadError={(error) => {
-                        console.error('PDF page load error:', error);
+                        console.error('PDF load error:', error);
+                        if (error.message.includes('font') || error.message.includes('character')) {
+                          console.warn('Possible CJK font issue detected');
+                        }
                       }}
-                    />
-                  </Document>
-                  
-                  {numPages && numPages > 1 && (
-                    <div className="mt-4 flex items-center gap-4 bg-[#062e69]/10 px-4 py-2 rounded-lg">
-                      <button
-                        onClick={goToPrevPage}
-                        disabled={pageNumber <= 1}
-                        className="px-3 py-1 bg-[#062e69] text-white rounded disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        Previous
-                      </button>
-                      <span className="text-[#062e69] font-medium">
-                        Page {pageNumber} of {numPages}
-                      </span>
-                      <button
-                        onClick={goToNextPage}
-                        disabled={pageNumber >= numPages}
-                        className="px-3 py-1 bg-[#062e69] text-white rounded disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        Next
-                      </button>
+                    >
+                      <Page
+                        pageNumber={pageNumber}
+                        renderTextLayer={true}
+                        renderAnnotationLayer={true}
+                        className="shadow-lg"
+                        width={Math.min(window.innerWidth * 0.4, 800)}
+                        onLoadError={(error) => {
+                          console.error('PDF page load error:', error);
+                        }}
+                      />
+                    </Document>
+
+                    {numPages && numPages > 1 && (
+                      <div className="mt-4 flex items-center gap-4 bg-[#062e69]/10 px-4 py-2 rounded-lg">
+                        <button
+                          onClick={goToPrevPage}
+                          disabled={pageNumber <= 1}
+                          className="px-3 py-1 bg-[#062e69] text-white rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Previous
+                        </button>
+                        <span className="text-[#062e69] font-medium">
+                          Page {pageNumber} of {numPages}
+                        </span>
+                        <button
+                          onClick={goToNextPage}
+                          disabled={pageNumber >= numPages}
+                          className="px-3 py-1 bg-[#062e69] text-white rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Next
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ) : previewingFile && previewingFile.type === 'docx' ? (
+                  <div
+                    ref={docxPreviewRef}
+                    className="docx-preview-container bg-white p-4 rounded-lg shadow-inner"
+                    style={{
+                      minHeight: '500px',
+                      maxWidth: '100%',
+                      overflow: 'auto'
+                    }}
+                  />
+                ) : selectedJobForPreview ? (
+                  <div className="flex items-center justify-center h-full text-[#062e69]/60">
+                    <div className="text-center">
+                      <Loader2 className="w-12 h-12 mx-auto mb-2 opacity-40 animate-spin" />
+                      <p className="text-sm">Loading preview...</p>
                     </div>
-                  )}
-                </div>
-              ) : previewingFile && previewingFile.type === 'docx' ? (
-                <div 
-                  ref={docxPreviewRef}
-                  className="docx-preview-container bg-white p-4 rounded-lg shadow-inner"
-                  style={{
-                    minHeight: '500px',
-                    maxWidth: '100%',
-                    overflow: 'auto'
-                  }}
-                />
-              ) : selectedJobForPreview ? (
-                <div className="flex items-center justify-center h-full text-[#062e69]/60">
-                  <div className="text-center">
-                    <Loader2 className="w-12 h-12 mx-auto mb-2 opacity-40 animate-spin" />
-                    <p className="text-sm">Loading preview...</p>
                   </div>
-                </div>
-              ) : (
-                <div className="flex items-center justify-center h-full text-[#062e69]/60">
-                  <div className="text-center">
-                    <FileText className="w-12 h-12 mx-auto mb-2 opacity-40" />
-                    <p className="text-sm">
-                      {translationJobs.length > 0 ? 'Select a completed file to preview' : 'No files available for preview'}
-                    </p>
+                ) : (
+                  <div className="flex items-center justify-center h-full text-[#062e69]/60">
+                    <div className="text-center">
+                      <FileText className="w-12 h-12 mx-auto mb-2 opacity-40" />
+                      <p className="text-sm">
+                        {translationJobs.length > 0 ? 'Select a completed file to preview' : 'No files available for preview'}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
             </div>
 
-            {/* Download Button */}
             <div className="p-4 border-t border-[#062e69]/10">
               <button
                 onClick={() => selectedJobForPreview && handleDownload(selectedJobForPreview)}
                 disabled={!selectedJobForPreview || !jobStatuses[selectedJobForPreview]?.download_id}
-                className="w-full bg-gradient-to-r from-[#062e69] to-[#062e69]/80 hover:from-[#062e69]/90 hover:to-[#062e69] text-white px-4 py-3 rounded-xl font-medium transition-all duration-200 transform hover:scale-105 hover:shadow-lg hover:shadow-[#062e69]/25 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                className="w-full bg-gradient-to-r from-[#062e69] to-[#062e69]/80 hover:from-[#062e69]/90 hover:to-[#062e69] text-white px-4 py-3 rounded-xl font-medium transition-all duration-200 transform hover:scale-101 hover:shadow-lg hover:shadow-[#062e69]/25 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
               >
                 <Download className="w-4 h-4" />
                 <span>
-                  {selectedJobForPreview 
+                  {selectedJobForPreview
                     ? `Download ${translationJobs.find(j => j.job_id === selectedJobForPreview)?.filename || 'File'}`
                     : 'Select file to download'
                   }
