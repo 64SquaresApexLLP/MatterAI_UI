@@ -878,14 +878,14 @@ const Home = ({ user, onBack, onLogout }) => {
                       ({translationJobs.length} total, {Object.keys(groupedJobs).length} file{Object.keys(groupedJobs).length > 1 ? 's' : ''})
                     </span>
                   </h3>
-                  <button
+                  {/* <button
                     onClick={refreshEvaluations}
                     className="flex items-center space-x-2 bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors text-sm"
                     title="Refresh evaluation data for completed jobs"
                   >
                     <TrendingUp className="w-4 h-4" />
                     <span>Refresh Evaluations</span>
-                  </button>
+                  </button> */}
                   <button
                     onClick={handleDownloadAll}
                     className="flex items-center space-x-2 bg-[#062e69] text-white px-4 py-2 rounded-lg hover:bg-[#062e69]/90 transition-colors text-sm"
