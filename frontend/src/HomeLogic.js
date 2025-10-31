@@ -35,31 +35,74 @@ const LANGUAGE_MAPPING = {
 };
 
 const extractLanguagesFromPrompt = (prompt) => {
+  if (!prompt || typeof prompt !== 'string') {
+    return [];
+  }
+
   const lowerPrompt = prompt.toLowerCase();
-  // Pattern 1: "Translate to German, French, and Spanish"
-  // Pattern 2: "Translate to German and French"
-  // Pattern 3: "German, French, Spanish"
+  const foundLanguages = new Set(); // Use Set to avoid duplicates
 
-  const languages = [];
-
-  Object.keys(LANGUAGE_MAPPING).forEach(lang => {
-    if (lowerPrompt.includes(lang.toLowerCase())) {
-      languages.push(lang);
-    }
+  // Create a list of all possible language identifiers (display names + backend names)
+  const languageIdentifiers = [];
+  
+  Object.entries(LANGUAGE_MAPPING).forEach(([displayName, backendName]) => {
+    languageIdentifiers.push({
+      displayName,
+      backendName,
+      searchTerms: [
+        displayName.toLowerCase(),
+        backendName.toLowerCase(),
+        // Add abbreviated forms
+        ...displayName.toLowerCase().split(' '),
+        ...backendName.toLowerCase().split(' ')
+      ].filter(term => term.length > 2) // Filter out very short terms
+    });
   });
 
-  Object.values(LANGUAGE_MAPPING).forEach(lang => {
-    if (lowerPrompt.includes(lang) && !languages.find(l => LANGUAGE_MAPPING[l] === lang)) {
-      const displayName = Object.keys(LANGUAGE_MAPPING).find(
-        key => LANGUAGE_MAPPING[key] === lang
-      );
-      if (displayName && !languages.includes(displayName)) {
-        languages.push(displayName);
+  // Step 1: Split the prompt by common delimiters
+  // Replace multiple delimiters with a single separator
+  const normalizedPrompt = lowerPrompt
+    .replace(/\s+and\s+/g, ',')        // "chinese and japanese" -> "chinese,japanese"
+    .replace(/\s*,\s*/g, ',')          // "chinese , japanese" -> "chinese,japanese"
+    .replace(/\s+/g, ' ')              // Normalize spaces
+    .trim();
+
+  // Split by comma first, then by space for each segment
+  const segments = normalizedPrompt.split(',').flatMap(seg => seg.trim().split(' '));
+
+  // Step 2: Check each segment against all language identifiers
+  segments.forEach(segment => {
+    if (!segment || segment.length < 3) return; // Skip very short segments
+    
+    languageIdentifiers.forEach(({ displayName, searchTerms }) => {
+      // Check if segment matches any search term
+      const isMatch = searchTerms.some(term => {
+        // Exact match or segment contains the term as a whole word
+        return segment === term || 
+               segment.includes(term) ||
+               term.includes(segment);
+      });
+
+      if (isMatch) {
+        foundLanguages.add(displayName);
       }
-    }
+    });
   });
 
-  return languages;
+  // Step 3: Additional check - look for full language names in the original prompt
+  // This catches cases where languages might be part of longer phrases
+  languageIdentifiers.forEach(({ displayName, searchTerms }) => {
+    searchTerms.forEach(term => {
+      // Use word boundary regex to match whole words
+      const regex = new RegExp(`\\b${term}\\b`, 'i');
+      if (regex.test(lowerPrompt)) {
+        foundLanguages.add(displayName);
+      }
+    });
+  });
+
+  // Convert Set to Array and return
+  return Array.from(foundLanguages);
 };
 
 export const translationAPI = {
@@ -1133,6 +1176,30 @@ export const useHomeLogic = () => {
     }
   };
 
+  const testCases = [
+  "chinese japanese",
+  "chinese and japanese",
+  "chinese,japanese",
+  "chinese , japanese",
+  "Translate to German, French, and Spanish",
+  "Translate to simplified chinese and japanese",
+  "german french spanish italian",
+  "Please translate this to Korean and Swedish",
+  "chinese",
+  "translate to chinese, japanese, korean",
+  "german,french,spanish,italian,english",
+  "CHINESE JAPANESE GERMAN",
+  "Translate document to french and german languages",
+];
+
+console.log("Testing Enhanced Language Extraction:\n");
+testCases.forEach(testCase => {
+  const extracted = extractLanguagesFromPrompt(testCase);
+  console.log(`Input: "${testCase}"`);
+  console.log(`Extracted: [${extracted.join(', ')}]`);
+  console.log(`Count: ${extracted.length}\n`);
+});
+
   return {
     percentage,
     query,
@@ -1177,6 +1244,8 @@ export const useHomeLogic = () => {
     handleDownloadAll,
     detectCJKLanguage,
     fetchEvaluation,
-    refreshEvaluations  // NEW: Export the manual refresh function
+    extractLanguagesFromPrompt, 
+    LANGUAGE_MAPPING, 
+    refreshEvaluations
   };
 };

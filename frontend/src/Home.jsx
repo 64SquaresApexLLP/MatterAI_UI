@@ -35,16 +35,14 @@ import {
   languages,
   formatFileSize
 } from "./HomeLogic";
+import TimesheetOptions from "./TimesheetOptions";
 import { Document, Page, pdfjs } from 'react-pdf';
+import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 import { renderAsync } from 'docx-preview';
-
-import TimesheetOptions from "./TimesheetOptions";
-
 import { loadNotoCJK } from "./utils/loadNotoCJK";
 import { previewCJKPdf } from "./utils/previewCJKPdf";
-import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
@@ -199,7 +197,10 @@ const Home = ({ user, onBack, onLogout }) => {
     removeFile,
     handleDownload,
     handleDownloadAll,
-    fetchEvaluation
+    fetchEvaluation,
+    refreshEvaluations,
+    extractLanguagesFromPrompt,
+    LANGUAGE_MAPPING
   } = useHomeLogic();
 
   const [numPages, setNumPages] = useState(null);
@@ -235,18 +236,14 @@ const Home = ({ user, onBack, onLogout }) => {
       if (selectedJobForPreview && jobStatuses[selectedJobForPreview]?.status === 'COMPLETED') {
         const jobStatus = jobStatuses[selectedJobForPreview];
         const selectedJob = translationJobs.find(job => job.job_id === selectedJobForPreview);
-
         if (jobStatus.download_id && selectedJob) {
           try {
             const mightBeCJK = isPotentiallyCJK(selectedJob.filename, selectedJob.target_language);
-
             const response = await fetch(`${import.meta.env.VITE_TRANSLATION_API_URL}/download/${jobStatus.download_id}`, {
               method: 'GET',
             });
-
             if (response.ok) {
               const contentType = response.headers.get('content-type');
-
               if (contentType && contentType.includes('application/pdf')) {
                 if (mightBeCJK) {
                   await loadNotoCJK();
@@ -284,14 +281,12 @@ const Home = ({ user, onBack, onLogout }) => {
         }
       }
     };
-
     loadPreviewFile();
   }, [selectedJobForPreview, jobStatuses, translationJobs]);
 
   useEffect(() => {
     if (previewingFile?.file && previewingFile.type === 'docx' && docxPreviewRef.current) {
       docxPreviewRef.current.innerHTML = '';
-
       renderAsync(previewingFile.file, docxPreviewRef.current, undefined, {
         className: 'docx-wrapper',
         inWrapper: true,
@@ -370,15 +365,12 @@ const Home = ({ user, onBack, onLogout }) => {
     setShowPreview(false);
     setPageNumber(1);
     setSelectedJobForPreview(null);
-
     if (previewingFile?.file && typeof previewingFile.file === 'string' && previewingFile.file.startsWith('blob:')) {
       URL.revokeObjectURL(previewingFile.file);
     }
-
     if (previewUrl && previewUrl.startsWith('blob:')) {
       URL.revokeObjectURL(previewUrl);
     }
-
     setPreviewingFile(null);
     setPreviewUrl(null);
     setCurrentPreviewFileType(null);
@@ -420,10 +412,13 @@ const Home = ({ user, onBack, onLogout }) => {
 
   const detectMultiLanguageMode = () => {
     if (uploadedFiles.length === 1 && query.trim()) {
-      const lowerQuery = query.toLowerCase();
-      const languageKeywords = ['german', 'french', 'spanish', 'italian', 'chinese', 'japanese', 'korean', 'swedish', 'danish', 'dutch', 'finnish', 'english'];
-      const foundLanguages = languageKeywords.filter(lang => lowerQuery.includes(lang));
-      return foundLanguages.length > 1;
+      // const lowerQuery = query.toLowerCase();
+      // const languageKeywords = ['german', 'french', 'spanish', 'italian', 'chinese', 'japanese', 'korean', 'swedish', 'danish', 'dutch', 'finnish', 'english'];
+      // const foundLanguages = languageKeywords.filter(lang => lowerQuery.includes(lang));
+      // return foundLanguages.length > 1;
+
+      const extractedLanguages = extractLanguagesFromPrompt(query);
+      return extractedLanguages.length > 1;
     }
     return false;
   };
@@ -450,7 +445,6 @@ const Home = ({ user, onBack, onLogout }) => {
         pauseOnHover
         theme="light"
       />
-
       {notificationHelper.isSupported() && notificationPermission !== "granted" && (
         <div className="fixed top-20 right-4 z-50">
           <button
@@ -463,7 +457,6 @@ const Home = ({ user, onBack, onLogout }) => {
           </button>
         </div>
       )}
-
       {notificationHelper.isSupported() && (
         <div className="fixed bottom-4 left-4 z-50">
           <div
@@ -493,13 +486,11 @@ const Home = ({ user, onBack, onLogout }) => {
           </div>
         </div>
       )}
-
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-[#062e69]/20 rounded-full blur-3xl animate-pulse"></div>
         <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-[#062e69]/15 rounded-full blur-3xl animate-pulse delay-1000"></div>
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-[#062e69]/10 rounded-full blur-2xl animate-ping"></div>
       </div>
-
       <div className="absolute top-4 left-4 z-20">
         <button
           className="flex items-center space-x-4 rounded-xl px-4 py-2 text-white hover:bg-white/10 transition-colors"
@@ -508,7 +499,6 @@ const Home = ({ user, onBack, onLogout }) => {
           ← Back to Chatbot Selection
         </button>
       </div>
-
       <div className="absolute top-4 right-4 z-20">
         <div className="flex items-center space-x-4 bg-white/90 backdrop-blur-xl border border-[#062e69]/30 rounded-xl px-4 py-2 shadow-lg">
           <div className="flex items-center space-x-2 text-[#062e69]">
@@ -525,7 +515,6 @@ const Home = ({ user, onBack, onLogout }) => {
           </button>
         </div>
       </div>
-
       <div className={`flex-1 p-6 transition-all duration-300 max-h-screen overflow-y-auto ${showPreview ? "pr-2" : ""}`}>
         <div className={`relative z-10 w-full mx-auto transition-all duration-300 ${showPreview ? "max-w-3xl" : "max-w-5xl"}`}>
           <div className="text-center mb-12 animate-fade-in pt-16">
@@ -536,7 +525,6 @@ const Home = ({ user, onBack, onLogout }) => {
             </div>
             <h1 className="text-4xl md:text-5xl font-light text-white mb-2 animate-slide-up">How can our AI assist you?</h1>
           </div>
-
           <div className="mb-4 animate-slide-up delay-200">
             <div className="relative group">
               <div className="absolute inset-0 bg-gradient-to-r from-[#062e69]/25 to-white/20 rounded-2xl blur-xl group-hover:blur-2xl transition-all duration-300"></div>
@@ -568,7 +556,6 @@ const Home = ({ user, onBack, onLogout }) => {
                   className="flex-1 bg-transparent text-[#062e69] placeholder-[#062e69]/50 focus:outline-none text-lg font-medium"
                   disabled={replacementStep === 1}
                 />
-
                 {selectedButton === "Translation" && (
                   <div className="relative flex mr-1">
                     <div className="relative">
@@ -649,7 +636,6 @@ const Home = ({ user, onBack, onLogout }) => {
                     </div>
                   </div>
                 )}
-
                 <input
                   type="file"
                   ref={fileInputRef}
@@ -668,7 +654,6 @@ const Home = ({ user, onBack, onLogout }) => {
                 >
                   <Paperclip className="w-5 h-5" />
                 </button>
-
                 <button
                   type="button"
                   onClick={toggleListening}
@@ -679,7 +664,6 @@ const Home = ({ user, onBack, onLogout }) => {
                 >
                   <Mic className="w-5 h-5" />
                 </button>
-
                 {showTranslateButtonFinal && (
                   <button
                     onClick={handleSubmit}
@@ -704,7 +688,6 @@ const Home = ({ user, onBack, onLogout }) => {
                   </button>
                 )}
               </div>
-
               {isDragOver && (
                 <div className="absolute inset-0 bg-[#062e69]/10 backdrop-blur-sm rounded-2xl border-2 border-dashed border-[#062e69]/50 flex items-center justify-center z-10">
                   <div className="text-[#062e69] font-medium flex items-center space-x-2">
@@ -714,7 +697,6 @@ const Home = ({ user, onBack, onLogout }) => {
                 </div>
               )}
             </div>
-
             {!showTranslateButtonFinal && showReplacePrompt && (
               <div className="mt-2 flex items-center space-x-4 bg-yellow-50 border border-yellow-300 rounded-lg p-3 text-yellow-900 max-w-5xl">
                 {awaitingReplaceResponse ? (
@@ -764,7 +746,6 @@ const Home = ({ user, onBack, onLogout }) => {
               </div>
             )}
           </div>
-
           {selectedButton === "Translation" && isMultiLanguageMode && (
             <div className="mb-4 p-3 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg animate-slide-up">
               <div className="flex items-center space-x-2">
@@ -776,7 +757,6 @@ const Home = ({ user, onBack, onLogout }) => {
               </div>
             </div>
           )}
-
           {selectedButton === "Translation" && (
             <div className="mb-2 text-xs text-white/70 text-center bg-white/10 backdrop-blur-sm rounded-lg p-3 border border-white/20">
               <div className="flex items-center justify-between mb-1 cursor-pointer" onClick={() => setShowPromptSection((prev) => !prev)}>
@@ -804,7 +784,6 @@ const Home = ({ user, onBack, onLogout }) => {
               )}
             </div>
           )}
-
           {selectedButton === "Translation" && (
             <div className="mt-2 mb-4 text-xs text-white/70 text-center bg-white/10 backdrop-blur-sm rounded-lg p-3 border border-white/20">
               <div className="flex items-center justify-between mb-1 cursor-pointer" onClick={() => setShowOptionsSection((prev) => !prev)}>
@@ -823,7 +802,6 @@ const Home = ({ user, onBack, onLogout }) => {
               )}
             </div>
           )}
-
           {isListening && (
             <div className="flex justify-center mt-2 space-x-1 mb-4">
               {[...Array(5)].map((_, i) => (
@@ -838,7 +816,6 @@ const Home = ({ user, onBack, onLogout }) => {
               ))}
             </div>
           )}
-
           {uploadedFiles.length > 0 && (
             <div className="mb-8 animate-slide-up delay-300">
               <div className="bg-white/90 backdrop-blur-xl border border-[#062e69]/30 rounded-2xl p-4 shadow-lg">
@@ -890,7 +867,6 @@ const Home = ({ user, onBack, onLogout }) => {
               </div>
             </div>
           )}
-
           {translationJobs.length > 0 && (
             <div className="mb-8 animate-slide-up delay-500">
               <div className="bg-white/90 backdrop-blur-xl border border-[#062e69]/30 rounded-2xl p-4 shadow-lg">
@@ -903,6 +879,14 @@ const Home = ({ user, onBack, onLogout }) => {
                     </span>
                   </h3>
                   <button
+                    onClick={refreshEvaluations}
+                    className="flex items-center space-x-2 bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors text-sm"
+                    title="Refresh evaluation data for completed jobs"
+                  >
+                    <TrendingUp className="w-4 h-4" />
+                    <span>Refresh Evaluations</span>
+                  </button>
+                  <button
                     onClick={handleDownloadAll}
                     className="flex items-center space-x-2 bg-[#062e69] text-white px-4 py-2 rounded-lg hover:bg-[#062e69]/90 transition-colors text-sm"
                   >
@@ -910,7 +894,6 @@ const Home = ({ user, onBack, onLogout }) => {
                     <span>Download All Completed</span>
                   </button>
                 </div>
-
                 <div className="space-y-4">
                   {Object.entries(groupedJobs).map(([filename, jobs]) => (
                     <div key={filename} className="border border-[#062e69]/20 rounded-xl p-4 bg-[#062e69]/5">
@@ -921,12 +904,10 @@ const Home = ({ user, onBack, onLogout }) => {
                           ({jobs.length} translation{jobs.length > 1 ? 's' : ''} - {jobs.map(j => j.target_language).join(', ')})
                         </span>
                       </div>
-
                       <div className="space-y-2">
                         {jobs.map((job) => {
                           const status = jobStatuses[job.job_id];
                           const evaluation = evaluationData[job.job_id];
-
                           return (
                             <div
                               key={job.job_id}
@@ -953,13 +934,11 @@ const Home = ({ user, onBack, onLogout }) => {
                                     )}
                                   </div>
                                 </div>
-
                                 <div className="flex items-center space-x-2">
                                   <div className={`px-2 py-1 rounded-full text-xs font-medium border flex items-center space-x-1 ${getStatusColor(status?.status || 'PENDING')}`}>
                                     {getStatusIcon(status?.status || 'PENDING')}
                                     <span>{status?.status || 'PENDING'}</span>
                                   </div>
-
                                   {evaluation && status?.status === 'COMPLETED' && (
                                     <button
                                       onClick={() => toggleEvaluationDetails(job.job_id)}
@@ -969,7 +948,6 @@ const Home = ({ user, onBack, onLogout }) => {
                                       <Info className="w-4 h-4" />
                                     </button>
                                   )}
-
                                   {status?.status === 'COMPLETED' && (
                                     <button
                                       onClick={() => {
@@ -982,7 +960,6 @@ const Home = ({ user, onBack, onLogout }) => {
                                       <Eye className="w-4 h-4" />
                                     </button>
                                   )}
-
                                   {status?.status === 'COMPLETED' && (
                                     <button
                                       onClick={() => handleDownload(job.job_id)}
@@ -994,7 +971,6 @@ const Home = ({ user, onBack, onLogout }) => {
                                   )}
                                 </div>
                               </div>
-
                               {evaluation && showEvaluationDetails[job.job_id] && (
                                 <div className="mt-3 pt-3 border-t border-[#062e69]/10">
                                   <div className="space-y-2 text-sm">
@@ -1002,12 +978,10 @@ const Home = ({ user, onBack, onLogout }) => {
                                       <span className="text-[#062e69]/70">Source Language:</span>
                                       <span className="font-medium text-[#062e69]">{evaluation.source_language || 'N/A'}</span>
                                     </div>
-
                                     <div className="flex items-center justify-between">
                                       <span className="text-[#062e69]/70">Evaluation Method:</span>
                                       <span className="font-medium text-[#062e69] text-xs">{evaluation.evaluation_method || 'N/A'}</span>
                                     </div>
-
                                     {evaluation.detailed_analysis && (
                                       <>
                                         {evaluation.detailed_analysis.strengths && evaluation.detailed_analysis.strengths.length > 0 && (
@@ -1023,7 +997,6 @@ const Home = ({ user, onBack, onLogout }) => {
                                             </ul>
                                           </div>
                                         )}
-
                                         {evaluation.detailed_analysis.improvement_areas && evaluation.detailed_analysis.improvement_areas.length > 0 && (
                                           <div className="mt-2">
                                             <div className="text-[#062e69]/70 font-medium mb-1 flex items-center space-x-1">
@@ -1037,7 +1010,6 @@ const Home = ({ user, onBack, onLogout }) => {
                                             </ul>
                                           </div>
                                         )}
-
                                         {evaluation.detailed_analysis.overall_assessment && (
                                           <div className="mt-2">
                                             <div className="text-[#062e69]/70 font-medium mb-1">Overall Assessment:</div>
@@ -1048,7 +1020,6 @@ const Home = ({ user, onBack, onLogout }) => {
                                         )}
                                       </>
                                     )}
-
                                     {evaluation.error && (
                                       <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">
                                         <strong>Evaluation Error:</strong> {evaluation.error}
@@ -1067,7 +1038,6 @@ const Home = ({ user, onBack, onLogout }) => {
               </div>
             </div>
           )}
-
           <div className="flex flex-wrap justify-center gap-4 animate-slide-up delay-400">
             <button
               onClick={() => handleButtonClick("Translation")}
@@ -1079,7 +1049,6 @@ const Home = ({ user, onBack, onLogout }) => {
               <Languages className="w-4 h-4 inline-block mr-2" />
               Translation
             </button>
-
             <button
               onClick={() => handleButtonClick("Timesheet")}
               className={`group backdrop-blur-xl border font-medium transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-[#062e69]/25 px-6 py-3 rounded-xl ${selectedButton === "Timesheet"
@@ -1089,7 +1058,6 @@ const Home = ({ user, onBack, onLogout }) => {
             >
               Timesheet
             </button>
-
             <button
               onClick={() => handleButtonClick("Matters")}
               className={`group backdrop-blur-xl border font-medium transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-[#062e69]/25 px-6 py-3 rounded-xl ${selectedButton === "Matters"
@@ -1099,7 +1067,6 @@ const Home = ({ user, onBack, onLogout }) => {
             >
               Matters
             </button>
-
             <button
               onClick={() => handleButtonClick("Entries")}
               className={`group backdrop-blur-xl border font-medium transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-[#062e69]/25 px-6 py-3 rounded-xl ${selectedButton === "Entries"
@@ -1110,7 +1077,6 @@ const Home = ({ user, onBack, onLogout }) => {
               Entries
             </button>
           </div>
-
           {textTranslationResult && (
             <div className="mt-8 animate-slide-up delay-500">
               <div className="bg-white/90 backdrop-blur-xl border border-[#062e69]/30 rounded-2xl p-6 shadow-lg">
@@ -1128,7 +1094,6 @@ const Home = ({ user, onBack, onLogout }) => {
                     <X className="w-5 h-5" />
                   </button>
                 </div>
-
                 <div className="space-y-4">
                   <div>
                     <label className="text-sm font-medium text-[#062e69]/70 mb-2 block">
@@ -1138,7 +1103,6 @@ const Home = ({ user, onBack, onLogout }) => {
                       {query}
                     </p>
                   </div>
-
                   <div>
                     <label className="text-sm font-medium text-[#062e69]/70 mb-2 block">
                       Translated Text ({selectedLanguage}):
@@ -1147,7 +1111,6 @@ const Home = ({ user, onBack, onLogout }) => {
                       {textTranslationResult.translated_text}
                     </p>
                   </div>
-
                   {textTranslationResult.message && (
                     <div className="text-sm text-green-600 flex items-center space-x-2">
                       <CheckCircle className="w-4 h-4" />
@@ -1158,7 +1121,6 @@ const Home = ({ user, onBack, onLogout }) => {
               </div>
             </div>
           )}
-
           {showTimesheet && (
             <div className="mt-8 animate-fade-in">
               <TimesheetOptions
@@ -1169,7 +1131,6 @@ const Home = ({ user, onBack, onLogout }) => {
               />
             </div>
           )}
-
           {showEntries && (
             <div className="mt-8 animate-fade-in">
               <TimesheetEntries
@@ -1181,7 +1142,6 @@ const Home = ({ user, onBack, onLogout }) => {
           )}
         </div>
       </div>
-
       {showPreview && (
         <div className="w-1/2 p-2 bg-white/5 backdrop-blur-sm border-l border-white/10 animate-slide-in-right overflow-y-auto max-h-screen">
           <div className="h-full bg-white/95 backdrop-blur-xl border border-[#062e69]/30 rounded-2xl shadow-lg flex flex-col overflow-y-auto max-h-screen">
@@ -1198,13 +1158,11 @@ const Home = ({ user, onBack, onLogout }) => {
                 <h3 className="text-lg font-semibold text-[#062e69]">
                   Translation Preview
                 </h3>
-
                 {useCJKMode && (
                   <div className="ml-4 px-3 py-1 bg-blue-100 text-blue-800 text-xs rounded-full border border-blue-300">
                     🌏 CJK Mode
                   </div>
                 )}
-
                 {selectedJobForPreview && evaluationData[selectedJobForPreview] && evaluationData[selectedJobForPreview].combined_accuracy !== undefined && (
                   <div className={`ml-4 px-3 py-1 rounded-full text-sm font-medium border flex items-center space-x-1 ${getAccuracyColor(evaluationData[selectedJobForPreview].combined_accuracy)}`}>
                     <TrendingUp className="w-4 h-4" />
@@ -1242,7 +1200,6 @@ const Home = ({ user, onBack, onLogout }) => {
                       );
                     })}
                 </select>
-
                 {selectedJobForPreview && evaluationData[selectedJobForPreview] && !evaluationData[selectedJobForPreview].error && (
                   <div className="mt-3 p-3 bg-[#062e69]/5 rounded-lg border border-[#062e69]/10">
                     <div className="text-xs space-y-1">
@@ -1270,7 +1227,6 @@ const Home = ({ user, onBack, onLogout }) => {
                 )}
               </div>
             )}
-
             <div className="flex-1 p-4 overflow-y-auto">
               {useCJKMode && previewUrl && currentPreviewFileType === 'application/pdf' ? (
                 <iframe
@@ -1317,7 +1273,6 @@ const Home = ({ user, onBack, onLogout }) => {
                         }}
                       />
                     </Document>
-
                     {numPages && numPages > 1 && (
                       <div className="mt-4 flex items-center gap-4 bg-[#062e69]/10 px-4 py-2 rounded-lg">
                         <button
@@ -1368,7 +1323,6 @@ const Home = ({ user, onBack, onLogout }) => {
                   </div>
                 )}
             </div>
-
             <div className="p-4 border-t border-[#062e69]/10">
               <button
                 onClick={() => selectedJobForPreview && handleDownload(selectedJobForPreview)}
