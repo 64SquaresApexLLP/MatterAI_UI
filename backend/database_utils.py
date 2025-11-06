@@ -124,8 +124,11 @@ def update_timesheet_entry(entry_id: int, entry_data: dict):
 
 def delete_timesheet_entry(entry_id: int):
     try:
-        query = "DELETE FROM timesheets WHERE id = %(entry_id)s"
-        run_snowflake_query(query, {"entry_id": entry_id})
-        return {"success": True, "message": "Timesheet entry deleted"}
+        query = "DELETE FROM MATTERAI_DB.PUBLIC.TIMESHEET_ENTRIES WHERE ID = %s"
+        result = run_snowflake_query(query, (entry_id,))
+        if result and result.get("success"):
+            return {"success": True, "message": "Timesheet entry deleted"}
+        else:
+            return {"success": False, "message": result.get("message", "Delete failed") if result else "Database error"}
     except Exception as e:
         return {"success": False, "message": str(e)}

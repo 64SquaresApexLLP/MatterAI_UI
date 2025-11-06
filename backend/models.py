@@ -13,6 +13,9 @@ class BillCode(str, Enum):
     NON_BILLABLE = "Non-Billable"
 
 class Status(str, Enum):
+    DRAFT = "Draft"
+    SUBMITTED = "Submitted"
+    APPROVED = "Approved"
     INVOICE = "Invoice"
     HOLD = "Hold"
 
@@ -76,6 +79,9 @@ class QueryResponse(BaseModel):
 
 # Timesheet Models
 class TimesheetEntry(BaseModel):
+    # ID
+    id: Optional[str] = Field(None, description="Entry ID")
+
     # General Info
     client: str = Field(..., description="Client name")
     matter: str = Field(..., description="Matter description")
