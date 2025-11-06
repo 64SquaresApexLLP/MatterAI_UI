@@ -24,7 +24,7 @@ import {
   Info,
   Globe,
   Copy,
-  MessageCircle
+  MessageCircle,
 } from "lucide-react";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -34,14 +34,14 @@ import {
   useHomeLogic,
   notificationHelper,
   languages,
-  formatFileSize
+  formatFileSize,
 } from "./HomeLogic";
 import TimesheetOptions from "./TimesheetOptions";
-import { Document, Page, pdfjs } from 'react-pdf';
-import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
-import 'react-pdf/dist/Page/AnnotationLayer.css';
-import 'react-pdf/dist/Page/TextLayer.css';
-import { renderAsync } from 'docx-preview';
+import { Document, Page, pdfjs } from "react-pdf";
+import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
+import "react-pdf/dist/Page/AnnotationLayer.css";
+import "react-pdf/dist/Page/TextLayer.css";
+import { renderAsync } from "docx-preview";
 import { loadNotoCJK } from "./utils/loadNotoCJK";
 import { previewCJKPdf } from "./utils/previewCJKPdf";
 
@@ -52,30 +52,30 @@ const jurisdictions = [
   "US Patent & Trademark Office (USPTO)",
   "Japan Patent Office (JPO)",
   "Korean Intellectual Property Office (KIPO)",
-  "Chinese National Intellectual Property Administration (CNIPA)"
+  "Chinese National Intellectual Property Administration (CNIPA)",
 ];
 
 const jurisdictionPrompts = new Map([
   [
     "Chinese National Intellectual Property Administration (CNIPA)",
-    "You are an expert Chinese patent translator with extensive experience in CNIPA filing procedures. Your task is to translate a foreign language patent specification into Chinese for filing with the China National Intellectual Property Administration (CNIPA, [translate:中国国家知识产权局]). Your translation must be technically precise, legally sound, and adhere strictly to Chinese patent practice and the conventions of the Chinese Patent Law ([translate:专利法])."
+    "You are an expert Chinese patent translator with extensive experience in CNIPA filing procedures. Your task is to translate a foreign language patent specification into Chinese for filing with the China National Intellectual Property Administration (CNIPA, [translate:中国国家知识产权局]). Your translation must be technically precise, legally sound, and adhere strictly to Chinese patent practice and the conventions of the Chinese Patent Law ([translate:专利法]).",
   ],
   [
     "Korean Intellectual Property Office (KIPO)",
-    "You are an expert Korean patent translator (변리사 or patent translator with extensive KIPO experience). Your task is to translate a foreign language patent specification into Korean for filing with the Korean Intellectual Property Office (KIPO). Your translation must be technically precise, legally sound, and adhere strictly to Korean patent practice and conventions."
+    "You are an expert Korean patent translator (변리사 or patent translator with extensive KIPO experience). Your task is to translate a foreign language patent specification into Korean for filing with the Korean Intellectual Property Office (KIPO). Your translation must be technically precise, legally sound, and adhere strictly to Korean patent practice and conventions.",
   ],
   [
     "Japan Patent Office (JPO)",
-    "You are an expert Japanese patent translator (弁理士 or patent translator with extensive JPO experience). Your task is to translate a foreign language patent specification into Japanese for filing with the Japan Patent Office (JPO). Your translation must be technically precise, legally sound, and adhere strictly to Japanese patent practice and conventions."
+    "You are an expert Japanese patent translator (弁理士 or patent translator with extensive JPO experience). Your task is to translate a foreign language patent specification into Japanese for filing with the Japan Patent Office (JPO). Your translation must be technically precise, legally sound, and adhere strictly to Japanese patent practice and conventions.",
   ],
   [
     "US Patent & Trademark Office (USPTO)",
-    "You are an expert US patent translator with extensive experience in USPTO filing procedures. Your task is to translate a patent specification into English for filing with the United States Patent and Trademark Office (USPTO). Your translation must be technically precise, legally sound, and adhere strictly to US patent practice and conventions."
+    "You are an expert US patent translator with extensive experience in USPTO filing procedures. Your task is to translate a patent specification into English for filing with the United States Patent and Trademark Office (USPTO). Your translation must be technically precise, legally sound, and adhere strictly to US patent practice and conventions.",
   ],
   [
     "European Patent Office (EPO)",
-    "You are an expert European patent translator with extensive experience in EPO filing procedures. Your task is to translate a patent specification into English, French, or German for filing with the European Patent Office (EPO). Your translation must be technically precise, legally sound, and adhere strictly to the conventions of European patent practice under the European Patent Convention (EPC). Produce a filing-ready European patent specification that is a faithful and literal translation of the source text, preserving the exact scope of the invention, particularly in the claims. When translating repeated instances of a word in the source text, the same instance of the translated word should be used unless there is a compelling reason not to, in order to maintain consistent terminology."
-  ]
+    "You are an expert European patent translator with extensive experience in EPO filing procedures. Your task is to translate a patent specification into English, French, or German for filing with the European Patent Office (EPO). Your translation must be technically precise, legally sound, and adhere strictly to the conventions of European patent practice under the European Patent Convention (EPC). Produce a filing-ready European patent specification that is a faithful and literal translation of the source text, preserving the exact scope of the invention, particularly in the claims. When translating repeated instances of a word in the source text, the same instance of the translated word should be used unless there is a compelling reason not to, in order to maintain consistent terminology.",
+  ],
 ]);
 
 const pdfOptions = {
@@ -86,23 +86,38 @@ const pdfOptions = {
   useOnlyCssZoom: true,
   textLayerMode: 2,
   annotationMode: 2,
-  verbosity: 1
+  verbosity: 1,
 };
 
 const containsCJK = (text) => {
-  const cjkRegex = /[\u2E80-\u2EFF\u2F00-\u2FDF\u3040-\u309F\u30A0-\u30FF\u3100-\u312F\u3200-\u32FF\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/;
+  const cjkRegex =
+    /[\u2E80-\u2EFF\u2F00-\u2FDF\u3040-\u309F\u30A0-\u30FF\u3100-\u312F\u3200-\u32FF\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/;
   return cjkRegex.test(text);
 };
 
-const isPotentiallyCJK = (filename, targetLanguage = '') => {
-  const cjkLanguages = ['chinese', 'japanese', 'korean', 'zh', 'ja', 'ko', 'cn', 'jp', 'kr', '中文', '日本語', '한국어'];
+const isPotentiallyCJK = (filename, targetLanguage = "") => {
+  const cjkLanguages = [
+    "chinese",
+    "japanese",
+    "korean",
+    "zh",
+    "ja",
+    "ko",
+    "cn",
+    "jp",
+    "kr",
+    "中文",
+    "日本語",
+    "한국어",
+  ];
   const lowerFilename = filename.toLowerCase();
   const lowerLanguage = targetLanguage.toLowerCase();
-  return cjkLanguages.some(lang =>
-    lowerFilename.includes(lang) ||
-    lowerLanguage.includes(lang) ||
-    containsCJK(filename) ||
-    containsCJK(targetLanguage)
+  return cjkLanguages.some(
+    (lang) =>
+      lowerFilename.includes(lang) ||
+      lowerLanguage.includes(lang) ||
+      containsCJK(filename) ||
+      containsCJK(targetLanguage)
   );
 };
 
@@ -124,11 +139,11 @@ const getFileIcon = (fileName, fileType) => {
 
 const getStatusIcon = (status) => {
   switch (status) {
-    case 'COMPLETED':
+    case "COMPLETED":
       return <CheckCircle className="w-4 h-4 text-green-500" />;
-    case 'PROCESSING':
+    case "PROCESSING":
       return <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />;
-    case 'FAILED':
+    case "FAILED":
       return <AlertCircle className="w-4 h-4 text-red-500" />;
     default:
       return <Clock className="w-4 h-4 text-yellow-500" />;
@@ -137,22 +152,22 @@ const getStatusIcon = (status) => {
 
 const getStatusColor = (status) => {
   switch (status) {
-    case 'COMPLETED':
-      return 'text-green-600 bg-green-50 border-green-200';
-    case 'PROCESSING':
-      return 'text-blue-600 bg-blue-50 border-blue-200';
-    case 'FAILED':
-      return 'text-red-600 bg-red-50 border-red-200';
+    case "COMPLETED":
+      return "text-green-600 bg-green-50 border-green-200";
+    case "PROCESSING":
+      return "text-blue-600 bg-blue-50 border-blue-200";
+    case "FAILED":
+      return "text-red-600 bg-red-50 border-red-200";
     default:
-      return 'text-yellow-600 bg-yellow-50 border-yellow-200';
+      return "text-yellow-600 bg-yellow-50 border-yellow-200";
   }
 };
 
 const getAccuracyColor = (accuracy) => {
-  if (accuracy >= 80) return 'text-green-600 bg-green-50 border-green-200';
-  if (accuracy >= 60) return 'text-yellow-600 bg-yellow-50 border-yellow-200';
-  if (accuracy >= 40) return 'text-orange-600 bg-orange-50 border-orange-200';
-  return 'text-red-600 bg-red-50 border-red-200';
+  if (accuracy >= 80) return "text-green-600 bg-green-50 border-green-200";
+  if (accuracy >= 60) return "text-yellow-600 bg-yellow-50 border-yellow-200";
+  if (accuracy >= 40) return "text-orange-600 bg-orange-50 border-orange-200";
+  return "text-red-600 bg-red-50 border-red-200";
 };
 
 const Home = ({ user, onBack, onLogout }) => {
@@ -203,7 +218,7 @@ const Home = ({ user, onBack, onLogout }) => {
     fetchEvaluation,
     refreshEvaluations,
     extractLanguagesFromPrompt,
-    LANGUAGE_MAPPING
+    LANGUAGE_MAPPING,
   } = useHomeLogic();
 
   const [numPages, setNumPages] = useState(null);
@@ -214,7 +229,8 @@ const Home = ({ user, onBack, onLogout }) => {
   const [previewUrl, setPreviewUrl] = useState(null);
   const [currentPreviewFileType, setCurrentPreviewFileType] = useState(null);
   const [useCJKMode, setUseCJKMode] = useState(false);
-  const [showJurisdictionDropdown, setShowJurisdictionDropdown] = useState(false);
+  const [showJurisdictionDropdown, setShowJurisdictionDropdown] =
+    useState(false);
 
   const docxPreviewRef = useRef(null);
 
@@ -224,30 +240,37 @@ const Home = ({ user, onBack, onLogout }) => {
 
   const [showFileSelector, setShowFileSelector] = useState(false);
 
-  const [showReplacePrompt, setShowReplacePrompt] = useState(false);
-  const [awaitingReplaceResponse, setAwaitingReplaceResponse] = useState(false);
-  const [hasReplacement, setHasReplacement] = useState(false);
-  const [replacementStep, setReplacementStep] = useState(0);
-  const [replacementInput, setReplacementInput] = useState("");
-
   useEffect(() => {
     setShowFileSelector(translationJobs.length > 0);
   }, [translationJobs]);
 
   useEffect(() => {
     const loadPreviewFile = async () => {
-      if (selectedJobForPreview && jobStatuses[selectedJobForPreview]?.status === 'COMPLETED') {
+      if (
+        selectedJobForPreview &&
+        jobStatuses[selectedJobForPreview]?.status === "COMPLETED"
+      ) {
         const jobStatus = jobStatuses[selectedJobForPreview];
-        const selectedJob = translationJobs.find(job => job.job_id === selectedJobForPreview);
+        const selectedJob = translationJobs.find(
+          (job) => job.job_id === selectedJobForPreview
+        );
         if (jobStatus.download_id && selectedJob) {
           try {
-            const mightBeCJK = isPotentiallyCJK(selectedJob.filename, selectedJob.target_language);
-            const response = await fetch(`${import.meta.env.VITE_TRANSLATION_API_URL}/download/${jobStatus.download_id}`, {
-              method: 'GET',
-            });
+            const mightBeCJK = isPotentiallyCJK(
+              selectedJob.filename,
+              selectedJob.target_language
+            );
+            const response = await fetch(
+              `${import.meta.env.VITE_TRANSLATION_API_URL}/download/${
+                jobStatus.download_id
+              }`,
+              {
+                method: "GET",
+              }
+            );
             if (response.ok) {
-              const contentType = response.headers.get('content-type');
-              if (contentType && contentType.includes('application/pdf')) {
+              const contentType = response.headers.get("content-type");
+              if (contentType && contentType.includes("application/pdf")) {
                 if (mightBeCJK) {
                   await loadNotoCJK();
                   await previewCJKPdf(
@@ -261,21 +284,34 @@ const Home = ({ user, onBack, onLogout }) => {
                 } else {
                   const blob = await response.blob();
                   const blobUrl = URL.createObjectURL(blob);
-                  setPreviewingFile({ file: blobUrl, type: 'pdf', jobId: selectedJobForPreview });
+                  setPreviewingFile({
+                    file: blobUrl,
+                    type: "pdf",
+                    jobId: selectedJobForPreview,
+                  });
                   setUseCJKMode(false);
                   setPreviewUrl(null);
                   setCurrentPreviewFileType(null);
                 }
-              } else if (contentType && contentType.includes('application/vnd.openxmlformats-officedocument.wordprocessingml.document')) {
+              } else if (
+                contentType &&
+                contentType.includes(
+                  "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                )
+              ) {
                 const blob = await response.blob();
-                setPreviewingFile({ file: blob, type: 'docx', jobId: selectedJobForPreview });
+                setPreviewingFile({
+                  file: blob,
+                  type: "docx",
+                  jobId: selectedJobForPreview,
+                });
                 setUseCJKMode(false);
                 setPreviewUrl(null);
                 setCurrentPreviewFileType(null);
               }
             }
           } catch (error) {
-            console.error('Error loading preview file:', error);
+            console.error("Error loading preview file:", error);
             setPreviewingFile(null);
             setPreviewUrl(null);
             setCurrentPreviewFileType(null);
@@ -288,10 +324,14 @@ const Home = ({ user, onBack, onLogout }) => {
   }, [selectedJobForPreview, jobStatuses, translationJobs]);
 
   useEffect(() => {
-    if (previewingFile?.file && previewingFile.type === 'docx' && docxPreviewRef.current) {
-      docxPreviewRef.current.innerHTML = '';
+    if (
+      previewingFile?.file &&
+      previewingFile.type === "docx" &&
+      docxPreviewRef.current
+    ) {
+      docxPreviewRef.current.innerHTML = "";
       renderAsync(previewingFile.file, docxPreviewRef.current, undefined, {
-        className: 'docx-wrapper',
+        className: "docx-wrapper",
         inWrapper: true,
         ignoreWidth: false,
         ignoreHeight: false,
@@ -307,15 +347,18 @@ const Home = ({ user, onBack, onLogout }) => {
         renderFootnotes: true,
         renderEndnotes: true,
         fontMapping: {
-          'SimSun': 'SimSun, "MS Mincho", "Yu Gothic", "Malgun Gothic", serif',
-          'MS Mincho': 'SimSun, "MS Mincho", "Yu Gothic", serif',
-          'Noto Sans CJK': 'Noto Sans CJK SC, Noto Sans CJK TC, Noto Sans CJK JP, Noto Sans CJK KR, sans-serif',
-          'Arial Unicode MS': 'Arial Unicode MS, "Yu Gothic", "Malgun Gothic", sans-serif',
-          'Malgun Gothic': 'Malgun Gothic, "Yu Gothic", sans-serif'
-        }
-      }).catch(error => {
-        console.error('Error rendering DOCX:', error);
-        docxPreviewRef.current.innerHTML = '<p class="text-red-500 p-4">Error loading document preview</p>';
+          SimSun: 'SimSun, "MS Mincho", "Yu Gothic", "Malgun Gothic", serif',
+          "MS Mincho": 'SimSun, "MS Mincho", "Yu Gothic", serif',
+          "Noto Sans CJK":
+            "Noto Sans CJK SC, Noto Sans CJK TC, Noto Sans CJK JP, Noto Sans CJK KR, sans-serif",
+          "Arial Unicode MS":
+            'Arial Unicode MS, "Yu Gothic", "Malgun Gothic", sans-serif',
+          "Malgun Gothic": 'Malgun Gothic, "Yu Gothic", sans-serif',
+        },
+      }).catch((error) => {
+        console.error("Error rendering DOCX:", error);
+        docxPreviewRef.current.innerHTML =
+          '<p class="text-red-500 p-4">Error loading document preview</p>';
       });
     }
   }, [previewingFile]);
@@ -324,54 +367,18 @@ const Home = ({ user, onBack, onLogout }) => {
     ? jurisdictionPrompts.get(selectedJurisdiction)
     : "Please select a jurisdiction to see the appropriate example patent translation prompt.";
 
-  const promptHasReplaceKeyword = query.toLowerCase().includes("replace");
-
-  const handleReplacementSubmit = () => {
-    if (replacementInput.trim()) {
-      setQuery(replacementInput.trim());
-      setHasReplacement(true);
-      setShowReplacePrompt(false);
-      setAwaitingReplaceResponse(false);
-      setReplacementStep(0);
-      setReplacementInput("");
-    }
-  };
-
-  const handleReplaceQuestionResponse = (response) => {
-    if (response === "yes") {
-      setReplacementStep(1);
-      setAwaitingReplaceResponse(false);
-    } else {
-      setHasReplacement(false);
-      setShowReplacePrompt(false);
-      setAwaitingReplaceResponse(false);
-      setReplacementStep(0);
-      setReplacementInput("");
-    }
-  };
-
-  useEffect(() => {
-    if (selectedButton === "Translation" && query.trim() && !promptHasReplaceKeyword && !hasReplacement) {
-      setShowReplacePrompt(true);
-      setAwaitingReplaceResponse(true);
-      setReplacementStep(0);
-    } else {
-      if (!hasReplacement) {
-        setShowReplacePrompt(false);
-      }
-    }
-  }, [query, selectedButton, promptHasReplaceKeyword, hasReplacement]);
-
-  const showTranslateButtonFinal = hasReplacement || promptHasReplaceKeyword || !showReplacePrompt;
-
   const handleClosePreview = () => {
     setShowPreview(false);
     setPageNumber(1);
     setSelectedJobForPreview(null);
-    if (previewingFile?.file && typeof previewingFile.file === 'string' && previewingFile.file.startsWith('blob:')) {
+    if (
+      previewingFile?.file &&
+      typeof previewingFile.file === "string" &&
+      previewingFile.file.startsWith("blob:")
+    ) {
       URL.revokeObjectURL(previewingFile.file);
     }
-    if (previewUrl && previewUrl.startsWith('blob:')) {
+    if (previewUrl && previewUrl.startsWith("blob:")) {
       URL.revokeObjectURL(previewUrl);
     }
     setPreviewingFile(null);
@@ -386,23 +393,23 @@ const Home = ({ user, onBack, onLogout }) => {
   };
 
   const goToPrevPage = () => {
-    setPageNumber(prev => Math.max(prev - 1, 1));
+    setPageNumber((prev) => Math.max(prev - 1, 1));
   };
 
   const goToNextPage = () => {
-    setPageNumber(prev => Math.min(prev + 1, numPages));
+    setPageNumber((prev) => Math.min(prev + 1, numPages));
   };
 
   const toggleEvaluationDetails = (jobId) => {
-    setShowEvaluationDetails(prev => ({
+    setShowEvaluationDetails((prev) => ({
       ...prev,
-      [jobId]: !prev[jobId]
+      [jobId]: !prev[jobId],
     }));
   };
 
   const groupJobsByFilename = () => {
     const grouped = {};
-    translationJobs.forEach(job => {
+    translationJobs.forEach((job) => {
       if (!grouped[job.filename]) {
         grouped[job.filename] = [];
       }
@@ -429,9 +436,9 @@ const Home = ({ user, onBack, onLogout }) => {
   const isMultiLanguageMode = detectMultiLanguageMode();
 
   useEffect(() => {
-    console.log('Translation Jobs:', translationJobs);
-    console.log('Job Statuses:', jobStatuses);
-    console.log('Evaluation Data:', evaluationData);
+    console.log("Translation Jobs:", translationJobs);
+    console.log("Job Statuses:", jobStatuses);
+    console.log("Evaluation Data:", evaluationData);
   }, [translationJobs, jobStatuses, evaluationData]);
 
   return (
@@ -448,27 +455,29 @@ const Home = ({ user, onBack, onLogout }) => {
         pauseOnHover
         theme="light"
       />
-      {notificationHelper.isSupported() && notificationPermission !== "granted" && (
-        <div className="fixed top-20 right-4 z-50">
-          <button
-            onClick={handleRequestNotificationPermission}
-            className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg transition-colors"
-            title="Enable notifications"
-          >
-            <Bell className="w-4 h-4" />
-            <span className="text-sm font-medium">Enable Notifications</span>
-          </button>
-        </div>
-      )}
+      {notificationHelper.isSupported() &&
+        notificationPermission !== "granted" && (
+          <div className="fixed top-20 right-4 z-50">
+            <button
+              onClick={handleRequestNotificationPermission}
+              className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg transition-colors"
+              title="Enable notifications"
+            >
+              <Bell className="w-4 h-4" />
+              <span className="text-sm font-medium">Enable Notifications</span>
+            </button>
+          </div>
+        )}
       {notificationHelper.isSupported() && (
         <div className="fixed bottom-4 left-4 z-50">
           <div
-            className={`flex items-center gap-2 px-3 py-2 rounded-lg shadow-md text-sm ${notificationPermission === "granted"
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg shadow-md text-sm ${
+              notificationPermission === "granted"
                 ? "bg-green-100 text-green-800"
                 : notificationPermission === "denied"
-                  ? "bg-red-100 text-red-800"
-                  : "bg-gray-100 text-gray-800"
-              }`}
+                ? "bg-red-100 text-red-800"
+                : "bg-gray-100 text-gray-800"
+            }`}
           >
             {notificationPermission === "granted" ? (
               <>
@@ -518,24 +527,35 @@ const Home = ({ user, onBack, onLogout }) => {
           </button>
         </div>
       </div>
-      <div className={`flex-1 p-6 transition-all duration-300 max-h-screen overflow-y-auto ${showPreview ? "pr-2" : ""}`}>
-        <div className={`relative z-10 w-full mx-auto transition-all duration-300 ${showPreview ? "max-w-3xl" : "max-w-5xl"}`}>
+      <div
+        className={`flex-1 p-6 transition-all duration-300 max-h-screen overflow-y-auto ${
+          showPreview ? "pr-2" : ""
+        }`}
+      >
+        <div
+          className={`relative z-10 w-full mx-auto transition-all duration-300 ${
+            showPreview ? "max-w-3xl" : "max-w-5xl"
+          }`}
+        >
           <div className="text-center mb-12 animate-fade-in pt-16">
             <div className="flex justify-center items-center mb-6">
               <div className="flex items-center space-x-2">
                 <img src={"./logo.png"} className="w-[20vw]" alt="Logo" />
               </div>
             </div>
-            <h1 className="text-4xl md:text-5xl font-light text-white mb-2 animate-slide-up">How can our AI assist you?</h1>
+            <h1 className="text-4xl md:text-5xl font-light text-white mb-2 animate-slide-up">
+              How can our AI assist you?
+            </h1>
           </div>
           <div className="mb-4 animate-slide-up delay-200">
             <div className="relative group">
               <div className="absolute inset-0 bg-gradient-to-r from-[#062e69]/25 to-white/20 rounded-2xl blur-xl group-hover:blur-2xl transition-all duration-300"></div>
               <div
-                className={`relative bg-white/95 backdrop-blur-xl border rounded-2xl p-4 flex items-center space-x-4 transition-all duration-300 ${isDragOver
+                className={`relative bg-white/95 backdrop-blur-xl border rounded-2xl p-4 flex items-center space-x-4 transition-all duration-300 ${
+                  isDragOver
                     ? "border-[#062e69]/70 bg-white shadow-xl"
                     : "border-[#062e69]/30 hover:border-[#062e69]/50 shadow-lg"
-                  }`}
+                }`}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
@@ -557,29 +577,35 @@ const Home = ({ user, onBack, onLogout }) => {
                       : "Case related questions..."
                   }
                   className="flex-1 bg-transparent text-[#062e69] placeholder-[#062e69]/50 focus:outline-none text-lg font-medium"
-                  disabled={replacementStep === 1}
                 />
                 {selectedButton === "Translation" && (
                   <div className="relative flex mr-1">
                     <div className="relative">
                       <button
                         type="button"
-                        onClick={() => setShowLanguageDropdown(!showLanguageDropdown)}
+                        onClick={() =>
+                          setShowLanguageDropdown(!showLanguageDropdown)
+                        }
                         className="p-2 text-[#062e69]/70 hover:text-[#062e69] transition-colors duration-200 hover:bg-[#062e69]/10 rounded-lg flex items-center space-x-1"
                         title="Select Language"
-                        disabled={awaitingReplaceResponse || replacementStep === 1}
                       >
                         <Languages className="w-5 h-5" />
                         {selectedLanguage ? (
-                          <span className="text-sm font-medium max-w-20 truncate">{selectedLanguage.split(" ")[0]}</span>
+                          <span className="text-sm font-medium max-w-20 truncate">
+                            {selectedLanguage.split(" ")[0]}
+                          </span>
                         ) : (
-                          <span className="text-sm text-[#062e69]/50">Language</span>
+                          <span className="text-sm text-[#062e69]/50">
+                            Language
+                          </span>
                         )}
                       </button>
-                      {showLanguageDropdown && !awaitingReplaceResponse && !replacementStep && (
+                      {showLanguageDropdown && (
                         <div className="absolute bottom-full right-0 mb-2 w-48 bg-white/95 backdrop-blur-xl border border-[#062e69]/30 rounded-xl shadow-xl z-30 max-h-60 overflow-y-auto">
                           <div className="p-2">
-                            <div className="text-[#062e69] font-medium text-sm mb-2 px-2">Select Language</div>
+                            <div className="text-[#062e69] font-medium text-sm mb-2 px-2">
+                              Select Language
+                            </div>
                             {languages.map((language) => (
                               <button
                                 key={language}
@@ -587,10 +613,11 @@ const Home = ({ user, onBack, onLogout }) => {
                                   handleLanguageSelect(language);
                                   setShowLanguageDropdown(false);
                                 }}
-                                className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-all duration-200 ${selectedLanguage === language
+                                className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-all duration-200 ${
+                                  selectedLanguage === language
                                     ? "bg-[#062e69] text-white"
                                     : "text-[#062e69] hover:bg-[#062e69]/10"
-                                  }`}
+                                }`}
                               >
                                 {language}
                               </button>
@@ -602,22 +629,29 @@ const Home = ({ user, onBack, onLogout }) => {
                     <div className="relative">
                       <button
                         type="button"
-                        onClick={() => setShowJurisdictionDropdown((prev) => !prev)}
+                        onClick={() =>
+                          setShowJurisdictionDropdown((prev) => !prev)
+                        }
                         className="p-2 text-[#062e69]/70 hover:text-[#062e69] transition-colors duration-200 hover:bg-[#062e69]/10 rounded-lg flex items-center space-x-1"
                         title="Select Jurisdiction"
-                        disabled={awaitingReplaceResponse || replacementStep === 1}
                       >
                         <Globe className="w-5 h-5" />
                         {selectedJurisdiction ? (
-                          <span className="text-sm font-medium max-w-24 truncate">{selectedJurisdiction}</span>
+                          <span className="text-sm font-medium max-w-24 truncate">
+                            {selectedJurisdiction}
+                          </span>
                         ) : (
-                          <span className="text-sm text-[#062e69]/50">Jurisdiction</span>
+                          <span className="text-sm text-[#062e69]/50">
+                            Jurisdiction
+                          </span>
                         )}
                       </button>
-                      {showJurisdictionDropdown && !awaitingReplaceResponse && !replacementStep && (
+                      {showJurisdictionDropdown && (
                         <div className="absolute bottom-full right-0 mb-2 w-48 bg-white/95 backdrop-blur-xl border border-[#062e69]/30 rounded-xl shadow-xl z-30 max-h-60 overflow-y-auto">
                           <div className="p-2">
-                            <div className="text-[#062e69] font-medium text-sm mb-2 px-2">Select Jurisdiction</div>
+                            <div className="text-[#062e69] font-medium text-sm mb-2 px-2">
+                              Select Jurisdiction
+                            </div>
                             {jurisdictions.map((jurisdiction) => (
                               <button
                                 key={jurisdiction}
@@ -625,10 +659,11 @@ const Home = ({ user, onBack, onLogout }) => {
                                   setSelectedJurisdiction(jurisdiction);
                                   setShowJurisdictionDropdown(false);
                                 }}
-                                className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-all duration-200 ${selectedJurisdiction === jurisdiction
+                                className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-all duration-200 ${
+                                  selectedJurisdiction === jurisdiction
                                     ? "bg-[#062e69] text-white"
                                     : "text-[#062e69] hover:bg-[#062e69]/10"
-                                  }`}
+                                }`}
                               >
                                 {jurisdiction}
                               </button>
@@ -644,52 +679,58 @@ const Home = ({ user, onBack, onLogout }) => {
                   ref={fileInputRef}
                   onChange={handleFileInputChange}
                   multiple={!isMultiLanguageMode}
-                  accept={selectedButton === "Translation" ? ".pdf,.docx,.pptx" : ".pdf,.doc,.docx,.txt,.xls,.xlsx"}
+                  accept={
+                    selectedButton === "Translation"
+                      ? ".pdf,.docx,.pptx"
+                      : ".pdf,.doc,.docx,.txt,.xls,.xlsx"
+                  }
                   className="hidden"
-                  disabled={replacementStep === 1}
                 />
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   className="flex-shrink-0 m-0 p-2 text-[#062e69]/70 hover:text-[#062e69] transition-colors duration-200 hover:bg-[#062e69]/10 rounded-lg"
-                  title={selectedButton === "Translation" ? "Upload files (PDF, DOCX, PPTX only)" : "Upload files"}
-                  disabled={replacementStep === 1}
+                  title={
+                    selectedButton === "Translation"
+                      ? "Upload files (PDF, DOCX, PPTX only)"
+                      : "Upload files"
+                  }
                 >
                   <Paperclip className="w-5 h-5" />
                 </button>
                 <button
                   type="button"
                   onClick={toggleListening}
-                  className={`flex-shrink-0 mr-2 p-2 rounded-lg transition-all duration-200 ${isListening ? "text-red-500 bg-red-500/20 animate-pulse" : "text-[#062e69]/70 hover:text-[#062e69] hover:bg-[#062e69]/10"
-                    }`}
+                  className={`flex-shrink-0 mr-2 p-2 rounded-lg transition-all duration-200 ${
+                    isListening
+                      ? "text-red-500 bg-red-500/20 animate-pulse"
+                      : "text-[#062e69]/70 hover:text-[#062e69] hover:bg-[#062e69]/10"
+                  }`}
                   title={isListening ? "Stop Listening" : "Start Listening"}
-                  disabled={replacementStep === 1}
                 >
                   <Mic className="w-5 h-5" />
                 </button>
-                {showTranslateButtonFinal && (
-                  <button
-                    onClick={handleSubmit}
-                    disabled={isTranslating}
-                    className="flex-shrink-0 bg-gradient-to-r from-[#062e69] to-[#062e69]/80 hover:from-[#062e69]/90 hover:to-[#062e69] text-white px-3 py-2 rounded-xl font-medium transition-all duration-200 transform hover:scale-105 hover:shadow-lg hover:shadow-[#062e69]/25 flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-                  >
-                    {isTranslating ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>Processing...</span>
-                      </>
-                    ) : selectedButton === "Translation" ? (
-                      <>
-                        <span>Translate</span>
-                      </>
-                    ) : (
-                      <>
-                        <span>Ask</span>
-                        <Send className="w-4 h-4" />
-                      </>
-                    )}
-                  </button>
-                )}
+                <button
+                  onClick={handleSubmit}
+                  disabled={isTranslating}
+                  className="flex-shrink-0 bg-gradient-to-r from-[#062e69] to-[#062e69]/80 hover:from-[#062e69]/90 hover:to-[#062e69] text-white px-3 py-2 rounded-xl font-medium transition-all duration-200 transform hover:scale-105 hover:shadow-lg hover:shadow-[#062e69]/25 flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                >
+                  {isTranslating ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Processing...</span>
+                    </>
+                  ) : selectedButton === "Translation" ? (
+                    <>
+                      <span>Translate</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Ask</span>
+                      <Send className="w-4 h-4" />
+                    </>
+                  )}
+                </button>
               </div>
               {isDragOver && (
                 <div className="absolute inset-0 bg-[#062e69]/10 backdrop-blur-sm rounded-2xl border-2 border-dashed border-[#062e69]/50 flex items-center justify-center z-10">
@@ -700,78 +741,45 @@ const Home = ({ user, onBack, onLogout }) => {
                 </div>
               )}
             </div>
-            {!showTranslateButtonFinal && showReplacePrompt && (
-              <div className="mt-2 flex items-center space-x-4 bg-yellow-50 border border-yellow-300 rounded-lg p-3 text-yellow-900 max-w-5xl">
-                {awaitingReplaceResponse ? (
-                  <>
-                    <span>Do you want any word to be replaced with another word?</span>
-                    <button
-                      onClick={() => handleReplaceQuestionResponse("yes")}
-                      className="px-3 py-1 bg-yellow-400 hover:bg-yellow-500 text-white rounded-md"
-                    >
-                      Yes
-                    </button>
-                    <button
-                      onClick={() => handleReplaceQuestionResponse("no")}
-                      className="px-3 py-1 bg-yellow-300 hover:bg-yellow-400 text-yellow-900 rounded-md"
-                    >
-                      No
-                    </button>
-                  </>
-                ) : replacementStep === 1 ? (
-                  <>
-                    <input
-                      type="text"
-                      value={replacementInput}
-                      onChange={(e) => setReplacementInput(e.target.value)}
-                      placeholder="Enter new prompt with replacements"
-                      className="flex-1 p-2 border border-yellow-400 rounded-md focus:outline-none"
-                    />
-                    <button
-                      onClick={handleReplacementSubmit}
-                      disabled={!replacementInput.trim()}
-                      className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-md disabled:opacity-50"
-                    >
-                      Submit
-                    </button>
-                    <button
-                      onClick={() => {
-                        setReplacementStep(0);
-                        setAwaitingReplaceResponse(true);
-                        setReplacementInput("");
-                      }}
-                      className="px-4 py-2 bg-yellow-300 hover:bg-yellow-400 text-yellow-900 rounded-md"
-                    >
-                      Cancel
-                    </button>
-                  </>
-                ) : null}
-              </div>
-            )}
           </div>
           {selectedButton === "Translation" && isMultiLanguageMode && (
             <div className="mb-4 p-3 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg animate-slide-up">
               <div className="flex items-center space-x-2">
                 <Globe className="w-5 h-5 text-blue-600" />
                 <div className="flex-1">
-                  <p className="text-sm font-semibold text-blue-900">🌍 Multi-Language Mode Active</p>
-                  <p className="text-xs text-blue-700 mt-0.5">Your file will be translated to multiple languages based on your prompt</p>
+                  <p className="text-sm font-semibold text-blue-900">
+                    🌍 Multi-Language Mode Active
+                  </p>
+                  <p className="text-xs text-blue-700 mt-0.5">
+                    Your file will be translated to multiple languages based on
+                    your prompt
+                  </p>
                 </div>
               </div>
             </div>
           )}
           {selectedButton === "Translation" && (
             <div className="mb-2 text-xs text-white/70 text-center bg-white/10 backdrop-blur-sm rounded-lg p-3 border border-white/20">
-              <div className="flex items-center justify-between mb-1 cursor-pointer" onClick={() => setShowPromptSection((prev) => !prev)}>
+              <div
+                className="flex items-center justify-between mb-1 cursor-pointer"
+                onClick={() => setShowPromptSection((prev) => !prev)}
+              >
                 <div className="flex items-center gap-2">
                   <Info className="w-4 h-4 text-white-600" />
-                  <span className="font-semibold text-white">Example Prompt for {selectedJurisdiction || "Patent Translation"}</span>
+                  <span className="font-semibold text-white">
+                    Example Prompt for{" "}
+                    {selectedJurisdiction || "Patent Translation"}
+                  </span>
                 </div>
-                <span className="text-white select-none">{showPromptSection ? "−" : "+"}</span>
+                <span className="text-white select-none">
+                  {showPromptSection ? "−" : "+"}
+                </span>
               </div>
               {showPromptSection && (
                 <div className="text-white-800 text-sm flex justify-between items-center">
-                  <div className="whitespace-pre-wrap text-left max-w-[85%]">{examplePrompt}</div>
+                  <div className="whitespace-pre-wrap text-left max-w-[85%]">
+                    {examplePrompt}
+                  </div>
                   <button
                     className="text-white hover:text-blue-400 p-1"
                     onClick={() => {
@@ -789,18 +797,32 @@ const Home = ({ user, onBack, onLogout }) => {
           )}
           {selectedButton === "Translation" && (
             <div className="mt-2 mb-4 text-xs text-white/70 text-center bg-white/10 backdrop-blur-sm rounded-lg p-3 border border-white/20">
-              <div className="flex items-center justify-between mb-1 cursor-pointer" onClick={() => setShowOptionsSection((prev) => !prev)}>
+              <div
+                className="flex items-center justify-between mb-1 cursor-pointer"
+                onClick={() => setShowOptionsSection((prev) => !prev)}
+              >
                 <div className="flex items-center space-x-2">
                   <Languages className="w-4 h-4" />
                   <strong>Translation Options</strong>
                 </div>
-                <span className="select-none">{showOptionsSection ? "−" : "+"}</span>
+                <span className="select-none">
+                  {showOptionsSection ? "−" : "+"}
+                </span>
               </div>
               {showOptionsSection && (
                 <div className="space-y-1 text-left">
-                  <p>📋 <strong>Single Language:</strong> Select language dropdown OR type "Translate to Spanish"</p>
-                  <p>🌐 <strong>Multiple Languages:</strong> Upload 1 file + type "Translate to German, French, and Spanish"</p>
-                  <p>📚 <strong>Multiple Files:</strong> Upload multiple files + select one language</p>
+                  <p>
+                    📋 <strong>Single Language:</strong> Select language
+                    dropdown OR type "Translate to Spanish"
+                  </p>
+                  <p>
+                    🌐 <strong>Multiple Languages:</strong> Upload 1 file + type
+                    "Translate to German, French, and Spanish"
+                  </p>
+                  <p>
+                    📚 <strong>Multiple Files:</strong> Upload multiple files +
+                    select one language
+                  </p>
                 </div>
               )}
             </div>
@@ -878,7 +900,9 @@ const Home = ({ user, onBack, onLogout }) => {
                     <Languages className="w-5 h-5" />
                     <span>Translation Jobs</span>
                     <span className="text-sm font-normal text-[#062e69]/60">
-                      ({translationJobs.length} total, {Object.keys(groupedJobs).length} file{Object.keys(groupedJobs).length > 1 ? 's' : ''})
+                      ({translationJobs.length} total,{" "}
+                      {Object.keys(groupedJobs).length} file
+                      {Object.keys(groupedJobs).length > 1 ? "s" : ""})
                     </span>
                   </h3>
                   {/* <button
@@ -899,12 +923,18 @@ const Home = ({ user, onBack, onLogout }) => {
                 </div>
                 <div className="space-y-4">
                   {Object.entries(groupedJobs).map(([filename, jobs]) => (
-                    <div key={filename} className="border border-[#062e69]/20 rounded-xl p-4 bg-[#062e69]/5">
+                    <div
+                      key={filename}
+                      className="border border-[#062e69]/20 rounded-xl p-4 bg-[#062e69]/5"
+                    >
                       <div className="flex items-center space-x-2 mb-3">
                         {getFileIcon(filename, "")}
-                        <h4 className="font-semibold text-[#062e69]">{filename}</h4>
+                        <h4 className="font-semibold text-[#062e69]">
+                          {filename}
+                        </h4>
                         <span className="text-xs text-[#062e69]/60">
-                          ({jobs.length} translation{jobs.length > 1 ? 's' : ''} - {jobs.map(j => j.target_language).join(', ')})
+                          ({jobs.length} translation{jobs.length > 1 ? "s" : ""}{" "}
+                          - {jobs.map((j) => j.target_language).join(", ")})
                         </span>
                       </div>
                       <div className="space-y-2">
@@ -923,35 +953,53 @@ const Home = ({ user, onBack, onLogout }) => {
                                       <span className="text-[#062e69] font-medium text-sm">
                                         {job.target_language.toUpperCase()}
                                       </span>
-                                      {evaluation && evaluation.combined_accuracy !== undefined && (
-                                        <div className={`px-2 py-0.5 rounded-full text-xs font-medium border flex items-center space-x-1 ${getAccuracyColor(evaluation.combined_accuracy)}`}>
-                                          <TrendingUp className="w-3 h-3" />
-                                          <span>{evaluation.combined_accuracy}% accuracy</span>
-                                        </div>
-                                      )}
+                                      {evaluation &&
+                                        evaluation.combined_accuracy !==
+                                          undefined && (
+                                          <div
+                                            className={`px-2 py-0.5 rounded-full text-xs font-medium border flex items-center space-x-1 ${getAccuracyColor(
+                                              evaluation.combined_accuracy
+                                            )}`}
+                                          >
+                                            <TrendingUp className="w-3 h-3" />
+                                            <span>
+                                              {evaluation.combined_accuracy}%
+                                              accuracy
+                                            </span>
+                                          </div>
+                                        )}
                                     </div>
                                     {status?.updated_at && (
                                       <div className="text-xs text-[#062e69]/50 mt-0.5">
-                                        {new Date(status.updated_at).toLocaleString()}
+                                        {new Date(
+                                          status.updated_at
+                                        ).toLocaleString()}
                                       </div>
                                     )}
                                   </div>
                                 </div>
                                 <div className="flex items-center space-x-2">
-                                  <div className={`px-2 py-1 rounded-full text-xs font-medium border flex items-center space-x-1 ${getStatusColor(status?.status || 'PENDING')}`}>
-                                    {getStatusIcon(status?.status || 'PENDING')}
-                                    <span>{status?.status || 'PENDING'}</span>
+                                  <div
+                                    className={`px-2 py-1 rounded-full text-xs font-medium border flex items-center space-x-1 ${getStatusColor(
+                                      status?.status || "PENDING"
+                                    )}`}
+                                  >
+                                    {getStatusIcon(status?.status || "PENDING")}
+                                    <span>{status?.status || "PENDING"}</span>
                                   </div>
-                                  {evaluation && status?.status === 'COMPLETED' && (
-                                    <button
-                                      onClick={() => toggleEvaluationDetails(job.job_id)}
-                                      className="p-1.5 text-[#062e69]/70 hover:text-[#062e69] hover:bg-[#062e69]/10 rounded-lg transition-colors"
-                                      title="View Evaluation Details"
-                                    >
-                                      <Info className="w-4 h-4" />
-                                    </button>
-                                  )}
-                                  {status?.status === 'COMPLETED' && (
+                                  {evaluation &&
+                                    status?.status === "COMPLETED" && (
+                                      <button
+                                        onClick={() =>
+                                          toggleEvaluationDetails(job.job_id)
+                                        }
+                                        className="p-1.5 text-[#062e69]/70 hover:text-[#062e69] hover:bg-[#062e69]/10 rounded-lg transition-colors"
+                                        title="View Evaluation Details"
+                                      >
+                                        <Info className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                  {status?.status === "COMPLETED" && (
                                     <button
                                       onClick={() => {
                                         setSelectedJobForPreview(job.job_id);
@@ -963,7 +1011,7 @@ const Home = ({ user, onBack, onLogout }) => {
                                       <Eye className="w-4 h-4" />
                                     </button>
                                   )}
-                                  {status?.status === 'COMPLETED' && (
+                                  {status?.status === "COMPLETED" && (
                                     <button
                                       onClick={() => handleDownload(job.job_id)}
                                       className="p-1.5 text-[#062e69]/70 hover:text-[#062e69] hover:bg-[#062e69]/10 rounded-lg transition-colors"
@@ -974,63 +1022,102 @@ const Home = ({ user, onBack, onLogout }) => {
                                   )}
                                 </div>
                               </div>
-                              {evaluation && showEvaluationDetails[job.job_id] && (
-                                <div className="mt-3 pt-3 border-t border-[#062e69]/10">
-                                  <div className="space-y-2 text-sm">
-                                    <div className="flex items-center justify-between">
-                                      <span className="text-[#062e69]/70">Source Language:</span>
-                                      <span className="font-medium text-[#062e69]">{evaluation.source_language || 'N/A'}</span>
-                                    </div>
-                                    <div className="flex items-center justify-between">
-                                      <span className="text-[#062e69]/70">Evaluation Method:</span>
-                                      <span className="font-medium text-[#062e69] text-xs">{evaluation.evaluation_method || 'N/A'}</span>
-                                    </div>
-                                    {evaluation.detailed_analysis && (
-                                      <>
-                                        {evaluation.detailed_analysis.strengths && evaluation.detailed_analysis.strengths.length > 0 && (
-                                          <div className="mt-2">
-                                            <div className="text-[#062e69]/70 font-medium mb-1 flex items-center space-x-1">
-                                              <CheckCircle className="w-3 h-3 text-green-500" />
-                                              <span>Strengths:</span>
-                                            </div>
-                                            <ul className="list-disc list-inside text-[#062e69]/80 space-y-0.5 ml-4">
-                                              {evaluation.detailed_analysis.strengths.map((strength, idx) => (
-                                                <li key={idx} className="text-xs">{strength}</li>
-                                              ))}
-                                            </ul>
-                                          </div>
-                                        )}
-                                        {evaluation.detailed_analysis.improvement_areas && evaluation.detailed_analysis.improvement_areas.length > 0 && (
-                                          <div className="mt-2">
-                                            <div className="text-[#062e69]/70 font-medium mb-1 flex items-center space-x-1">
-                                              <AlertTriangle className="w-3 h-3 text-yellow-500" />
-                                              <span>Areas for Improvement:</span>
-                                            </div>
-                                            <ul className="list-disc list-inside text-[#062e69]/80 space-y-0.5 ml-4">
-                                              {evaluation.detailed_analysis.improvement_areas.map((area, idx) => (
-                                                <li key={idx} className="text-xs">{area}</li>
-                                              ))}
-                                            </ul>
-                                          </div>
-                                        )}
-                                        {evaluation.detailed_analysis.overall_assessment && (
-                                          <div className="mt-2">
-                                            <div className="text-[#062e69]/70 font-medium mb-1">Overall Assessment:</div>
-                                            <p className="text-[#062e69]/80 text-xs bg-[#062e69]/5 p-2 rounded">
-                                              {evaluation.detailed_analysis.overall_assessment}
-                                            </p>
-                                          </div>
-                                        )}
-                                      </>
-                                    )}
-                                    {evaluation.error && (
-                                      <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">
-                                        <strong>Evaluation Error:</strong> {evaluation.error}
+                              {evaluation &&
+                                showEvaluationDetails[job.job_id] && (
+                                  <div className="mt-3 pt-3 border-t border-[#062e69]/10">
+                                    <div className="space-y-2 text-sm">
+                                      <div className="flex items-center justify-between">
+                                        <span className="text-[#062e69]/70">
+                                          Source Language:
+                                        </span>
+                                        <span className="font-medium text-[#062e69]">
+                                          {evaluation.source_language || "N/A"}
+                                        </span>
                                       </div>
-                                    )}
+                                      <div className="flex items-center justify-between">
+                                        <span className="text-[#062e69]/70">
+                                          Evaluation Method:
+                                        </span>
+                                        <span className="font-medium text-[#062e69] text-xs">
+                                          {evaluation.evaluation_method ||
+                                            "N/A"}
+                                        </span>
+                                      </div>
+                                      {evaluation.detailed_analysis && (
+                                        <>
+                                          {evaluation.detailed_analysis
+                                            .strengths &&
+                                            evaluation.detailed_analysis
+                                              .strengths.length > 0 && (
+                                              <div className="mt-2">
+                                                <div className="text-[#062e69]/70 font-medium mb-1 flex items-center space-x-1">
+                                                  <CheckCircle className="w-3 h-3 text-green-500" />
+                                                  <span>Strengths:</span>
+                                                </div>
+                                                <ul className="list-disc list-inside text-[#062e69]/80 space-y-0.5 ml-4">
+                                                  {evaluation.detailed_analysis.strengths.map(
+                                                    (strength, idx) => (
+                                                      <li
+                                                        key={idx}
+                                                        className="text-xs"
+                                                      >
+                                                        {strength}
+                                                      </li>
+                                                    )
+                                                  )}
+                                                </ul>
+                                              </div>
+                                            )}
+                                          {evaluation.detailed_analysis
+                                            .improvement_areas &&
+                                            evaluation.detailed_analysis
+                                              .improvement_areas.length > 0 && (
+                                              <div className="mt-2">
+                                                <div className="text-[#062e69]/70 font-medium mb-1 flex items-center space-x-1">
+                                                  <AlertTriangle className="w-3 h-3 text-yellow-500" />
+                                                  <span>
+                                                    Areas for Improvement:
+                                                  </span>
+                                                </div>
+                                                <ul className="list-disc list-inside text-[#062e69]/80 space-y-0.5 ml-4">
+                                                  {evaluation.detailed_analysis.improvement_areas.map(
+                                                    (area, idx) => (
+                                                      <li
+                                                        key={idx}
+                                                        className="text-xs"
+                                                      >
+                                                        {area}
+                                                      </li>
+                                                    )
+                                                  )}
+                                                </ul>
+                                              </div>
+                                            )}
+                                          {evaluation.detailed_analysis
+                                            .overall_assessment && (
+                                            <div className="mt-2">
+                                              <div className="text-[#062e69]/70 font-medium mb-1">
+                                                Overall Assessment:
+                                              </div>
+                                              <p className="text-[#062e69]/80 text-xs bg-[#062e69]/5 p-2 rounded">
+                                                {
+                                                  evaluation.detailed_analysis
+                                                    .overall_assessment
+                                                }
+                                              </p>
+                                            </div>
+                                          )}
+                                        </>
+                                      )}
+                                      {evaluation.error && (
+                                        <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">
+                                          <strong>Evaluation Error:</strong>{" "}
+                                          {evaluation.error}
+                                        </div>
+                                      )}
+                                    </div>
                                   </div>
-                                </div>
-                              )}
+                                )}
                             </div>
                           );
                         })}
@@ -1044,38 +1131,42 @@ const Home = ({ user, onBack, onLogout }) => {
           <div className="flex flex-wrap justify-center gap-4 animate-slide-up delay-400">
             <button
               onClick={() => handleButtonClick("Translation")}
-              className={`group relative backdrop-blur-xl border font-medium transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-[#062e69]/25 px-6 py-3 rounded-xl ${selectedButton === "Translation"
+              className={`group relative backdrop-blur-xl border font-medium transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-[#062e69]/25 px-6 py-3 rounded-xl ${
+                selectedButton === "Translation"
                   ? "bg-blue-900 text-white border-[#062e69] shadow-lg"
                   : "bg-white/90 border-[#062e69]/30 hover:border-[#062e69]/50 text-[#062e69]"
-                }`}
+              }`}
             >
               <Languages className="w-4 h-4 inline-block mr-2" />
               Translation
             </button>
             <button
               onClick={() => handleButtonClick("Timesheet")}
-              className={`group backdrop-blur-xl border font-medium transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-[#062e69]/25 px-6 py-3 rounded-xl ${selectedButton === "Timesheet"
+              className={`group backdrop-blur-xl border font-medium transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-[#062e69]/25 px-6 py-3 rounded-xl ${
+                selectedButton === "Timesheet"
                   ? "bg-blue-900 text-white border-[#062e69] shadow-lg"
                   : "bg-white/90 border-[#062e69]/30 hover:border-[#062e69]/50 text-[#062e69]"
-                }`}
+              }`}
             >
               Timesheet
             </button>
             <button
               onClick={() => handleButtonClick("Matters")}
-              className={`group backdrop-blur-xl border font-medium transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-[#062e69]/25 px-6 py-3 rounded-xl ${selectedButton === "Matters"
+              className={`group backdrop-blur-xl border font-medium transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-[#062e69]/25 px-6 py-3 rounded-xl ${
+                selectedButton === "Matters"
                   ? "bg-blue-900 text-white border-[#062e69] shadow-lg"
                   : "bg-white/90 border-[#062e69]/30 hover:border-[#062e69]/50 text-[#062e69]"
-                }`}
+              }`}
             >
               Matters
             </button>
             <button
               onClick={() => handleButtonClick("Entries")}
-              className={`group backdrop-blur-xl border font-medium transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-[#062e69]/25 px-6 py-3 rounded-xl ${selectedButton === "Entries"
+              className={`group backdrop-blur-xl border font-medium transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-[#062e69]/25 px-6 py-3 rounded-xl ${
+                selectedButton === "Entries"
                   ? "bg-blue-900 text-white border-[#062e69] shadow-lg"
                   : "bg-white/90 border-[#062e69]/30 hover:border-[#062e69]/50 text-[#062e69]"
-                }`}
+              }`}
             >
               Entries
             </button>
@@ -1108,7 +1199,8 @@ const Home = ({ user, onBack, onLogout }) => {
                   </div>
                   <div>
                     <label className="text-sm font-medium text-[#062e69]/70 mb-2 block">
-                      Response ({chatResponse.source_language || 'Auto-detected'}):
+                      Response (
+                      {chatResponse.source_language || "Auto-detected"}):
                     </label>
                     <p className="text-[#062e69] bg-blue-50 rounded-lg p-3 border border-blue-200 font-medium whitespace-pre-wrap">
                       {chatResponse.response}
@@ -1146,7 +1238,10 @@ const Home = ({ user, onBack, onLogout }) => {
                   </div>
                   <div>
                     <label className="text-sm font-medium text-[#062e69]/70 mb-2 block">
-                      Translated Text ({textTranslationResult.target_language || selectedLanguage}):
+                      Translated Text (
+                      {textTranslationResult.target_language ||
+                        selectedLanguage}
+                      ):
                     </label>
                     <p className="text-[#062e69] bg-green-50 rounded-lg p-3 border border-green-200 font-medium">
                       {textTranslationResult.translated_text}
@@ -1204,12 +1299,26 @@ const Home = ({ user, onBack, onLogout }) => {
                     🌏 CJK Mode
                   </div>
                 )}
-                {selectedJobForPreview && evaluationData[selectedJobForPreview] && evaluationData[selectedJobForPreview].combined_accuracy !== undefined && (
-                  <div className={`ml-4 px-3 py-1 rounded-full text-sm font-medium border flex items-center space-x-1 ${getAccuracyColor(evaluationData[selectedJobForPreview].combined_accuracy)}`}>
-                    <TrendingUp className="w-4 h-4" />
-                    <span>Accuracy: {evaluationData[selectedJobForPreview].combined_accuracy}%</span>
-                  </div>
-                )}
+                {selectedJobForPreview &&
+                  evaluationData[selectedJobForPreview] &&
+                  evaluationData[selectedJobForPreview].combined_accuracy !==
+                    undefined && (
+                    <div
+                      className={`ml-4 px-3 py-1 rounded-full text-sm font-medium border flex items-center space-x-1 ${getAccuracyColor(
+                        evaluationData[selectedJobForPreview].combined_accuracy
+                      )}`}
+                    >
+                      <TrendingUp className="w-4 h-4" />
+                      <span>
+                        Accuracy:{" "}
+                        {
+                          evaluationData[selectedJobForPreview]
+                            .combined_accuracy
+                        }
+                        %
+                      </span>
+                    </div>
+                  )}
               </div>
               <button
                 onClick={handleClosePreview}
@@ -1224,158 +1333,187 @@ const Home = ({ user, onBack, onLogout }) => {
                   Select file to preview:
                 </label>
                 <select
-                  value={selectedJobForPreview || ''}
+                  value={selectedJobForPreview || ""}
                   onChange={(e) => setSelectedJobForPreview(e.target.value)}
                   className="w-full p-2 border border-[#062e69]/30 rounded-lg bg-white text-[#062e69] focus:outline-none focus:border-[#062e69]/50"
                 >
                   <option value="">Choose a file...</option>
                   {translationJobs
-                    .filter(job => jobStatuses[job.job_id]?.status === 'COMPLETED')
-                    .map(job => {
+                    .filter(
+                      (job) => jobStatuses[job.job_id]?.status === "COMPLETED"
+                    )
+                    .map((job) => {
                       const evaluation = evaluationData[job.job_id];
                       return (
                         <option key={job.job_id} value={job.job_id}>
                           {job.filename} - {job.target_language.toUpperCase()}
-                          {evaluation?.combined_accuracy !== undefined ? ` (${evaluation.combined_accuracy}% accuracy)` : ''}
+                          {evaluation?.combined_accuracy !== undefined
+                            ? ` (${evaluation.combined_accuracy}% accuracy)`
+                            : ""}
                         </option>
                       );
                     })}
                 </select>
-                {selectedJobForPreview && evaluationData[selectedJobForPreview] && !evaluationData[selectedJobForPreview].error && (
-                  <div className="mt-3 p-3 bg-[#062e69]/5 rounded-lg border border-[#062e69]/10">
-                    <div className="text-xs space-y-1">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[#062e69]/70">Source Language:</span>
-                        <span className="font-medium text-[#062e69]">
-                          {evaluationData[selectedJobForPreview].source_language || 'N/A'}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-[#062e69]/70">Method:</span>
-                        <span className="font-medium text-[#062e69] text-xs">
-                          {evaluationData[selectedJobForPreview].evaluation_method || 'N/A'}
-                        </span>
-                      </div>
-                      {evaluationData[selectedJobForPreview].detailed_analysis?.overall_assessment && (
-                        <div className="mt-2 pt-2 border-t border-[#062e69]/10">
-                          <p className="text-[#062e69]/80 text-xs italic">
-                            {evaluationData[selectedJobForPreview].detailed_analysis.overall_assessment}
-                          </p>
+                {selectedJobForPreview &&
+                  evaluationData[selectedJobForPreview] &&
+                  !evaluationData[selectedJobForPreview].error && (
+                    <div className="mt-3 p-3 bg-[#062e69]/5 rounded-lg border border-[#062e69]/10">
+                      <div className="text-xs space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[#062e69]/70">
+                            Source Language:
+                          </span>
+                          <span className="font-medium text-[#062e69]">
+                            {evaluationData[selectedJobForPreview]
+                              .source_language || "N/A"}
+                          </span>
                         </div>
-                      )}
+                        <div className="flex items-center justify-between">
+                          <span className="text-[#062e69]/70">Method:</span>
+                          <span className="font-medium text-[#062e69] text-xs">
+                            {evaluationData[selectedJobForPreview]
+                              .evaluation_method || "N/A"}
+                          </span>
+                        </div>
+                        {evaluationData[selectedJobForPreview].detailed_analysis
+                          ?.overall_assessment && (
+                          <div className="mt-2 pt-2 border-t border-[#062e69]/10">
+                            <p className="text-[#062e69]/80 text-xs italic">
+                              {
+                                evaluationData[selectedJobForPreview]
+                                  .detailed_analysis.overall_assessment
+                              }
+                            </p>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
               </div>
             )}
             <div className="flex-1 p-4 overflow-y-auto">
-              {useCJKMode && previewUrl && currentPreviewFileType === 'application/pdf' ? (
+              {useCJKMode &&
+              previewUrl &&
+              currentPreviewFileType === "application/pdf" ? (
                 <iframe
                   src={previewUrl}
                   title="PDF Preview"
                   className="w-full h-full border-0 rounded-lg shadow-lg"
-                  style={{ minHeight: '600px' }}
+                  style={{ minHeight: "600px" }}
                 />
-              ) :
-                previewingFile && previewingFile.type === 'pdf' ? (
-                  <div className="flex flex-col items-center">
-                    <Document
-                      options={pdfOptions}
-                      file={previewingFile.file}
-                      onLoadSuccess={onDocumentLoadSuccess}
-                      loading={
-                        <div className="flex items-center justify-center p-8">
-                          <Loader2 className="w-8 h-8 animate-spin text-[#062e69]" />
-                        </div>
-                      }
-                      error={
-                        <div className="text-red-500 p-4 text-center">
-                          <p className="mb-2">Error loading PDF preview.</p>
-                          <p className="text-sm text-gray-600">
-                            The translated file is still available for download below.
-                          </p>
-                        </div>
-                      }
-                      onLoadError={(error) => {
-                        console.error('PDF load error:', error);
-                        if (error.message.includes('font') || error.message.includes('character')) {
-                          console.warn('Possible CJK font issue detected');
-                        }
-                      }}
-                    >
-                      <Page
-                        pageNumber={pageNumber}
-                        renderTextLayer={true}
-                        renderAnnotationLayer={true}
-                        className="shadow-lg"
-                        width={Math.min(window.innerWidth * 0.4, 800)}
-                        onLoadError={(error) => {
-                          console.error('PDF page load error:', error);
-                        }}
-                      />
-                    </Document>
-                    {numPages && numPages > 1 && (
-                      <div className="mt-4 flex items-center gap-4 bg-[#062e69]/10 px-4 py-2 rounded-lg">
-                        <button
-                          onClick={goToPrevPage}
-                          disabled={pageNumber <= 1}
-                          className="px-3 py-1 bg-[#062e69] text-white rounded disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          Previous
-                        </button>
-                        <span className="text-[#062e69] font-medium">
-                          Page {pageNumber} of {numPages}
-                        </span>
-                        <button
-                          onClick={goToNextPage}
-                          disabled={pageNumber >= numPages}
-                          className="px-3 py-1 bg-[#062e69] text-white rounded disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          Next
-                        </button>
+              ) : previewingFile && previewingFile.type === "pdf" ? (
+                <div className="flex flex-col items-center">
+                  <Document
+                    options={pdfOptions}
+                    file={previewingFile.file}
+                    onLoadSuccess={onDocumentLoadSuccess}
+                    loading={
+                      <div className="flex items-center justify-center p-8">
+                        <Loader2 className="w-8 h-8 animate-spin text-[#062e69]" />
                       </div>
-                    )}
-                  </div>
-                ) : previewingFile && previewingFile.type === 'docx' ? (
-                  <div
-                    ref={docxPreviewRef}
-                    className="docx-preview-container bg-white p-4 rounded-lg shadow-inner"
-                    style={{
-                      minHeight: '500px',
-                      maxWidth: '100%',
-                      overflow: 'auto'
+                    }
+                    error={
+                      <div className="text-red-500 p-4 text-center">
+                        <p className="mb-2">Error loading PDF preview.</p>
+                        <p className="text-sm text-gray-600">
+                          The translated file is still available for download
+                          below.
+                        </p>
+                      </div>
+                    }
+                    onLoadError={(error) => {
+                      console.error("PDF load error:", error);
+                      if (
+                        error.message.includes("font") ||
+                        error.message.includes("character")
+                      ) {
+                        console.warn("Possible CJK font issue detected");
+                      }
                     }}
-                  />
-                ) : selectedJobForPreview ? (
-                  <div className="flex items-center justify-center h-full text-[#062e69]/60">
-                    <div className="text-center">
-                      <Loader2 className="w-12 h-12 mx-auto mb-2 opacity-40 animate-spin" />
-                      <p className="text-sm">Loading preview...</p>
+                  >
+                    <Page
+                      pageNumber={pageNumber}
+                      renderTextLayer={true}
+                      renderAnnotationLayer={true}
+                      className="shadow-lg"
+                      width={Math.min(window.innerWidth * 0.4, 800)}
+                      onLoadError={(error) => {
+                        console.error("PDF page load error:", error);
+                      }}
+                    />
+                  </Document>
+                  {numPages && numPages > 1 && (
+                    <div className="mt-4 flex items-center gap-4 bg-[#062e69]/10 px-4 py-2 rounded-lg">
+                      <button
+                        onClick={goToPrevPage}
+                        disabled={pageNumber <= 1}
+                        className="px-3 py-1 bg-[#062e69] text-white rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Previous
+                      </button>
+                      <span className="text-[#062e69] font-medium">
+                        Page {pageNumber} of {numPages}
+                      </span>
+                      <button
+                        onClick={goToNextPage}
+                        disabled={pageNumber >= numPages}
+                        className="px-3 py-1 bg-[#062e69] text-white rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Next
+                      </button>
                     </div>
+                  )}
+                </div>
+              ) : previewingFile && previewingFile.type === "docx" ? (
+                <div
+                  ref={docxPreviewRef}
+                  className="docx-preview-container bg-white p-4 rounded-lg shadow-inner"
+                  style={{
+                    minHeight: "500px",
+                    maxWidth: "100%",
+                    overflow: "auto",
+                  }}
+                />
+              ) : selectedJobForPreview ? (
+                <div className="flex items-center justify-center h-full text-[#062e69]/60">
+                  <div className="text-center">
+                    <Loader2 className="w-12 h-12 mx-auto mb-2 opacity-40 animate-spin" />
+                    <p className="text-sm">Loading preview...</p>
                   </div>
-                ) : (
-                  <div className="flex items-center justify-center h-full text-[#062e69]/60">
-                    <div className="text-center">
-                      <FileText className="w-12 h-12 mx-auto mb-2 opacity-40" />
-                      <p className="text-sm">
-                        {translationJobs.length > 0 ? 'Select a completed file to preview' : 'No files available for preview'}
-                      </p>
-                    </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-full text-[#062e69]/60">
+                  <div className="text-center">
+                    <FileText className="w-12 h-12 mx-auto mb-2 opacity-40" />
+                    <p className="text-sm">
+                      {translationJobs.length > 0
+                        ? "Select a completed file to preview"
+                        : "No files available for preview"}
+                    </p>
                   </div>
-                )}
+                </div>
+              )}
             </div>
             <div className="p-4 border-t border-[#062e69]/10">
               <button
-                onClick={() => selectedJobForPreview && handleDownload(selectedJobForPreview)}
-                disabled={!selectedJobForPreview || !jobStatuses[selectedJobForPreview]?.download_id}
+                onClick={() =>
+                  selectedJobForPreview && handleDownload(selectedJobForPreview)
+                }
+                disabled={
+                  !selectedJobForPreview ||
+                  !jobStatuses[selectedJobForPreview]?.download_id
+                }
                 className="w-full bg-gradient-to-r from-[#062e69] to-[#062e69]/80 hover:from-[#062e69]/90 hover:to-[#062e69] text-white px-4 py-3 rounded-xl font-medium transition-all duration-200 transform hover:scale-101 hover:shadow-lg hover:shadow-[#062e69]/25 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
               >
                 <Download className="w-4 h-4" />
                 <span>
                   {selectedJobForPreview
-                    ? `Download ${translationJobs.find(j => j.job_id === selectedJobForPreview)?.filename || 'File'}`
-                    : 'Select file to download'
-                  }
+                    ? `Download ${
+                        translationJobs.find(
+                          (j) => j.job_id === selectedJobForPreview
+                        )?.filename || "File"
+                      }`
+                    : "Select file to download"}
                 </span>
               </button>
             </div>

@@ -13,17 +13,33 @@ const Login = ({ onLoginSuccess }) => {
     e.preventDefault();
     setIsLoading(true);
     setError("");
-    const responce = await authAPI.login(username, password);
 
-    // For this example, just simulate a delay and "successful login" logic
-    setTimeout(() => {
-      if (responce.success == true) {
-        onLoginSuccess({ username }); // Simulating a successful login
+    try {
+      const response = await authAPI.login(username, password);
+
+      if (response.success === true) {
+        onLoginSuccess({ username });
       } else {
         setError("Invalid username or password.");
       }
+    } catch (error) {
+      console.error("Login error:", error);
+      // Extract error message from the error object
+      const errorMessage = error.message || "Invalid username or password.";
+
+      // Check if the error message contains specific backend error details
+      if (errorMessage.includes("Invalid password")) {
+        setError("Incorrect password. Please try again.");
+      } else if (errorMessage.includes("User not found")) {
+        setError("User not found. Please check your email/username.");
+      } else if (errorMessage.includes("401")) {
+        setError("Invalid username or password.");
+      } else {
+        setError("Login failed. Please try again.");
+      }
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   return (

@@ -61,9 +61,14 @@ const apiCall = async (endpoint, options = {}) => {
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       console.error("API call failed:", response.status, errorData);
-      throw new Error(
-        errorData.message || `HTTP error! status: ${response.status}`
-      );
+
+      // Extract the error message from backend response
+      const errorMessage =
+        errorData.detail ||
+        errorData.message ||
+        `HTTP error! status: ${response.status}`;
+
+      throw new Error(errorMessage);
     }
 
     return await response.json();
