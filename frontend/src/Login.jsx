@@ -16,9 +16,8 @@ const Login = ({ onLoginSuccess }) => {
 
     try {
       const response = await authAPI.login(username, password);
-
       if (response.success === true) {
-        onLoginSuccess({ username });
+        onLoginSuccess({ username, token: response.token });
       } else {
         setError("Invalid username or password.");
       }
