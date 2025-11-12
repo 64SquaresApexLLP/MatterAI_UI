@@ -1,244 +1,11 @@
-import React, { useState, useRef, useEffect } from "react";
-import {
-  Send,
-  Mic,
-  Paperclip,
-  X,
-  FileText,
-  File,
-  LogOut,
-  User,
-  Languages,
-  Download,
-  Eye,
-  Loader2,
-  CheckCircle,
-  Upload,
-  Bell,
-  BellOff,
-  Clock,
-  AlertCircle,
-  DownloadCloud,
-  TrendingUp,
-  AlertTriangle,
-  Info,
-  Globe,
-  Copy,
-  MessageCircle,
-} from "lucide-react";
-import { ToastContainer } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
-import TimesheetForm from "./TimesheetForm";
-import TimesheetEntries from "./TimesheetEntries";
-import {
-  useHomeLogic,
-  notificationHelper,
-  languages,
-  formatFileSize,
-} from "./HomeLogic";
-import TimesheetOptions from "./TimesheetOptions";
-import { Document, Page, pdfjs } from "react-pdf";
-import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
-import "react-pdf/dist/Page/AnnotationLayer.css";
-import "react-pdf/dist/Page/TextLayer.css";
-import { renderAsync } from "docx-preview";
-import { loadNotoCJK } from "./utils/loadNotoCJK";
-import { previewCJKPdf } from "./utils/previewCJKPdf";
-
+import { React, useState, useRef, useEffect, Send, Mic, Paperclip, X, FileText, File, LogOut, User, Languages, Download, Eye, Loader2, CheckCircle, Upload, Bell, BellOff, Clock, AlertCircle, DownloadCloud, TrendingUp, AlertTriangle, Info, Globe, Copy, MessageCircle, ToastContainer, TimesheetForm, TimesheetEntries, useHomeLogic, notificationHelper, languages, formatFileSize, TimesheetOptions, Document, Page, pdfjs, pdfjsLib, renderAsync, loadNotoCJK, previewCJKPdf, docxPdf, Packer, Paragraph, TextRun, PDFDocument, rgb } from "./Imports.jsx";
+import { jurisdictions, jurisdictionPrompts, legendData, pdfOptions } from "./StaticData.jsx";
+import UseStates from "./UseStates.jsx";
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
-const jurisdictions = [
-  "European Patent Office (EPO)",
-  "US Patent & Trademark Office (USPTO)",
-  "Japan Patent Office (JPO)",
-  "Korean Intellectual Property Office (KIPO)",
-  "Chinese National Intellectual Property Administration (CNIPA)",
-];
-
-const jurisdictionPrompts = new Map([
-  [
-    "Chinese National Intellectual Property Administration (CNIPA)",
-    "You are an expert Chinese patent translator with extensive experience in CNIPA filing procedures. Your task is to translate a foreign language patent specification into Chinese for filing with the China National Intellectual Property Administration (CNIPA, [translate:中国国家知识产权局]). Your translation must be technically precise, legally sound, and adhere strictly to Chinese patent practice and the conventions of the Chinese Patent Law ([translate:专利法]).",
-  ],
-  [
-    "Korean Intellectual Property Office (KIPO)",
-    "You are an expert Korean patent translator (변리사 or patent translator with extensive KIPO experience). Your task is to translate a foreign language patent specification into Korean for filing with the Korean Intellectual Property Office (KIPO). Your translation must be technically precise, legally sound, and adhere strictly to Korean patent practice and conventions.",
-  ],
-  [
-    "Japan Patent Office (JPO)",
-    "You are an expert Japanese patent translator (弁理士 or patent translator with extensive JPO experience). Your task is to translate a foreign language patent specification into Japanese for filing with the Japan Patent Office (JPO). Your translation must be technically precise, legally sound, and adhere strictly to Japanese patent practice and conventions.",
-  ],
-  [
-    "US Patent & Trademark Office (USPTO)",
-    "You are an expert US patent translator with extensive experience in USPTO filing procedures. Your task is to translate a patent specification into English for filing with the United States Patent and Trademark Office (USPTO). Your translation must be technically precise, legally sound, and adhere strictly to US patent practice and conventions.",
-  ],
-  [
-    "European Patent Office (EPO)",
-    "You are an expert European patent translator with extensive experience in EPO filing procedures. Your task is to translate a patent specification into English, French, or German for filing with the European Patent Office (EPO). Your translation must be technically precise, legally sound, and adhere strictly to the conventions of European patent practice under the European Patent Convention (EPC). Produce a filing-ready European patent specification that is a faithful and literal translation of the source text, preserving the exact scope of the invention, particularly in the claims. When translating repeated instances of a word in the source text, the same instance of the translated word should be used unless there is a compelling reason not to, in order to maintain consistent terminology.",
-  ],
-]);
-
-const pdfOptions = {
-  cMapUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/cmaps/`,
-  cMapPacked: true,
-  enableXfa: true,
-  standardFontDataUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/standard_fonts/`,
-  useOnlyCssZoom: true,
-  textLayerMode: 2,
-  annotationMode: 2,
-  verbosity: 1,
-};
-
-const containsCJK = (text) => {
-  const cjkRegex =
-    /[\u2E80-\u2EFF\u2F00-\u2FDF\u3040-\u309F\u30A0-\u30FF\u3100-\u312F\u3200-\u32FF\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/;
-  return cjkRegex.test(text);
-};
-
-const isPotentiallyCJK = (filename, targetLanguage = "") => {
-  const cjkLanguages = [
-    "chinese",
-    "japanese",
-    "korean",
-    "zh",
-    "ja",
-    "ko",
-    "cn",
-    "jp",
-    "kr",
-    "中文",
-    "日本語",
-    "한국어",
-  ];
-  const lowerFilename = filename.toLowerCase();
-  const lowerLanguage = targetLanguage.toLowerCase();
-  return cjkLanguages.some(
-    (lang) =>
-      lowerFilename.includes(lang) ||
-      lowerLanguage.includes(lang) ||
-      containsCJK(filename) ||
-      containsCJK(targetLanguage)
-  );
-};
-
-const getFileIcon = (fileName, fileType) => {
-  if (fileType === "application/pdf" || fileName.endsWith(".pdf")) {
-    return <FileText className="w-4 h-4 text-red-400" />;
-  }
-  if (fileType.includes("word") || fileName.match(/\.(doc|docx)$/i)) {
-    return <FileText className="w-4 h-4 text-blue-400" />;
-  }
-  if (fileType.includes("excel") || fileName.match(/\.(xls|xlsx)$/i)) {
-    return <FileText className="w-4 h-4 text-green-400" />;
-  }
-  if (fileType.includes("presentation") || fileName.match(/\.(ppt|pptx)$/i)) {
-    return <FileText className="w-4 h-4 text-orange-400" />;
-  }
-  return <File className="w-4 h-4 text-gray-400" />;
-};
-
-const getStatusIcon = (status) => {
-  switch (status) {
-    case "COMPLETED":
-      return <CheckCircle className="w-4 h-4 text-green-500" />;
-    case "PROCESSING":
-      return <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />;
-    case "FAILED":
-      return <AlertCircle className="w-4 h-4 text-red-500" />;
-    default:
-      return <Clock className="w-4 h-4 text-yellow-500" />;
-  }
-};
-
-const getStatusColor = (status) => {
-  switch (status) {
-    case "COMPLETED":
-      return "text-green-600 bg-green-50 border-green-200";
-    case "PROCESSING":
-      return "text-blue-600 bg-blue-50 border-blue-200";
-    case "FAILED":
-      return "text-red-600 bg-red-50 border-red-200";
-    default:
-      return "text-yellow-600 bg-yellow-50 border-yellow-200";
-  }
-};
-
-const getAccuracyColor = (accuracy) => {
-  if (accuracy >= 80) return "text-green-600 bg-green-50 border-green-200";
-  if (accuracy >= 60) return "text-yellow-600 bg-yellow-50 border-yellow-200";
-  if (accuracy >= 40) return "text-orange-600 bg-orange-50 border-orange-200";
-  return "text-red-600 bg-red-50 border-red-200";
-};
-
 const Home = ({ user, onBack, onLogout }) => {
-  const {
-    percentage,
-    query,
-    setQuery,
-    selectedButton,
-    selectedLanguage,
-    showLanguageDropdown,
-    setShowLanguageDropdown,
-    uploadedFiles,
-    setUploadedFiles,
-    isDragOver,
-    isTranslating,
-    translationResult,
-    translationJobs,
-    jobStatuses,
-    evaluationData,
-    previewText,
-    showPreview,
-    setShowPreview,
-    fileInputRef,
-    showTimesheet,
-    setShowTimesheet,
-    showEntries,
-    setShowEntries,
-    isListening,
-    textTranslationResult,
-    setTextTranslationResult,
-    chatResponse,
-    setChatResponse,
-    notificationPermission,
-    handleRequestNotificationPermission,
-    previewFile,
-    previewFileType,
-    toggleListening,
-    handleButtonClick,
-    handleLanguageSelect,
-    handleSubmit,
-    handleFileInputChange,
-    handleDragOver,
-    handleDragLeave,
-    handleDrop,
-    removeFile,
-    handleDownload,
-    handleDownloadAll,
-    fetchEvaluation,
-    refreshEvaluations,
-    extractLanguagesFromPrompt,
-    LANGUAGE_MAPPING,
-  } = useHomeLogic();
-
-  const [numPages, setNumPages] = useState(null);
-  const [pageNumber, setPageNumber] = useState(1);
-  const [selectedJobForPreview, setSelectedJobForPreview] = useState(null);
-  const [previewingFile, setPreviewingFile] = useState(null);
-  const [showEvaluationDetails, setShowEvaluationDetails] = useState({});
-  const [previewUrl, setPreviewUrl] = useState(null);
-  const [currentPreviewFileType, setCurrentPreviewFileType] = useState(null);
-  const [useCJKMode, setUseCJKMode] = useState(false);
-  const [showJurisdictionDropdown, setShowJurisdictionDropdown] =
-    useState(false);
-
-  const docxPreviewRef = useRef(null);
-
-  const [selectedJurisdiction, setSelectedJurisdiction] = useState(null);
-  const [showPromptSection, setShowPromptSection] = useState(true);
-  const [showOptionsSection, setShowOptionsSection] = useState(true);
-
-  const [showFileSelector, setShowFileSelector] = useState(false);
+  const { percentage, query, setQuery, selectedButton, selectedLanguage, showLanguageDropdown, setShowLanguageDropdown, uploadedFiles, setUploadedFiles, isDragOver, isTranslating, translationResult, translationJobs, jobStatuses, evaluationData, previewText, showPreview, setShowPreview, fileInputRef, showTimesheet, setShowTimesheet, showEntries, setShowEntries, isListening, textTranslationResult, setTextTranslationResult, chatResponse, setChatResponse, notificationPermission, handleRequestNotificationPermission, previewFile, previewFileType, toggleListening, handleButtonClick, handleLanguageSelect, handleSubmit, handleFileInputChange, handleDragOver, handleDragLeave, handleDrop, removeFile, handleDownload, handleDownloadAll, fetchEvaluation, refreshEvaluations, extractLanguagesFromPrompt, LANGUAGE_MAPPING, isPotentiallyCJK } = useHomeLogic();
+  const { numPages, setNumPages, pageNumber, setPageNumber, selectedJobForPreview, setSelectedJobForPreview, previewingFile, setPreviewingFile, showEvaluationDetails, setShowEvaluationDetails, previewUrl, setPreviewUrl, currentPreviewFileType, setCurrentPreviewFileType, useCJKMode, setUseCJKMode, showJurisdictionDropdown, setShowJurisdictionDropdown, docxPreviewRef, selectedJurisdiction, setSelectedJurisdiction, showPromptSection, setShowPromptSection, showOptionsSection, setShowOptionsSection, showFileSelector, setShowFileSelector, convertingToPdf, setConvertingToPdf, hoveredItem, setHoveredItem } = UseStates();
 
   useEffect(() => {
     setShowFileSelector(translationJobs.length > 0);
@@ -422,18 +189,225 @@ const Home = ({ user, onBack, onLogout }) => {
 
   const detectMultiLanguageMode = () => {
     if (uploadedFiles.length === 1 && query.trim()) {
-      // const lowerQuery = query.toLowerCase();
-      // const languageKeywords = ['german', 'french', 'spanish', 'italian', 'chinese', 'japanese', 'korean', 'swedish', 'danish', 'dutch', 'finnish', 'english'];
-      // const foundLanguages = languageKeywords.filter(lang => lowerQuery.includes(lang));
-      // return foundLanguages.length > 1;
-
       const extractedLanguages = extractLanguagesFromPrompt(query);
       return extractedLanguages.length > 1;
     }
     return false;
   };
 
+  const convertDocxToPdf = async (docxBlob, filename) => {
+    setConvertingToPdf(true);
+
+    try {
+      const arrayBuffer = await docxBlob.arrayBuffer();
+      const pdfDoc = await PDFDocument.create();
+      const page = pdfDoc.addPage([600, 800]);
+      const { width, height } = page.getSize();
+
+      page.drawText("Converted from DOCX to PDF", {
+        x: 50,
+        y: height - 50,
+        size: 15,
+        color: rgb(0, 0, 0),
+      });
+
+      page.drawText(`Original filename: ${filename}`, {
+        x: 50,
+        y: height - 80,
+        size: 12,
+        color: rgb(0, 0, 0),
+      });
+
+      page.drawText("Note: This is a placeholder PDF conversion.", {
+        x: 50,
+        y: height - 110,
+        size: 10,
+        color: rgb(0.5, 0.5, 0.5),
+      });
+
+      page.drawText(
+        "Full DOCX to PDF conversion requires server-side processing.",
+        {
+          x: 50,
+          y: height - 130,
+          size: 10,
+          color: rgb(0.5, 0.5, 0.5),
+        }
+      );
+
+      const pdfBytes = await pdfDoc.save();
+      const pdfBlob = new Blob([pdfBytes], { type: "application/pdf" });
+      const pdfFilename = filename.replace(/\.docx?$/i, ".pdf");
+
+      setConvertingToPdf(false);
+      return { blob: pdfBlob, filename: pdfFilename };
+    } catch (error) {
+      console.error("Error converting DOCX to PDF:", error);
+      setConvertingToPdf(false);
+      throw error;
+    }
+  };
+
+  const base64ToBlob = (base64, mimeType) => {
+    const byteCharacters = atob(base64);
+    const byteArrays = [];
+    for (let offset = 0; offset < byteCharacters.length; offset += 512) {
+      const slice = byteCharacters.slice(offset, offset + 512);
+      const byteNumbers = new Array(slice.length);
+      for (let i = 0; i < slice.length; i++) {
+        byteNumbers[i] = slice.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      byteArrays.push(byteArray);
+    }
+    return new Blob(byteArrays, { type: mimeType });
+  };
+
+  const handleDownloadPdf = async (jobId) => {
+    try {
+      const jobStatus = jobStatuses[jobId];
+      const selectedJob = translationJobs.find((job) => job.job_id === jobId);
+
+      if (!jobStatus?.download_id || !selectedJob) {
+        console.error("Job not found or not completed");
+        return;
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_TRANSLATION_API_URL}/download/${
+          jobStatus.download_id
+        }`,
+        { method: "GET" }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to download file");
+      }
+
+      const blob = await response.blob();
+      const contentType = response.headers.get("content-type") || "";
+
+      if (
+        contentType.includes(
+          "vnd.openxmlformats-officedocument.wordprocessingml.document"
+        ) ||
+        selectedJob.filename.toLowerCase().endsWith(".docx")
+      ) {
+        const { blob: pdfBlob, filename: pdfFilename } =
+          await convertDocxToTextBasedPdf(blob, selectedJob.filename);
+        const url = URL.createObjectURL(pdfBlob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = pdfFilename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        3;
+      } else {
+        alert("PDF download is only available for Word documents");
+      }
+    } catch (error) {
+      alert(error);
+    }
+  };
+
+  const convertDocxToTextBasedPdf = async (docxBlob, filename) => {
+    setConvertingToPdf(true);
+    try {
+      const pdfDoc = await PDFDocument.create();
+      const page = pdfDoc.addPage([600, 800]);
+      const { width, height } = page.getSize();
+      const text = await docxBlob.text();
+      page.drawText(`Converted: ${filename}`, {
+        x: 50,
+        y: height - 50,
+        size: 15,
+        color: rgb(0, 0, 0),
+      });
+      page.drawText("DOCX content preview (basic conversion):", {
+        x: 50,
+        y: height - 80,
+        size: 12,
+        color: rgb(0, 0, 0),
+      });
+      page.drawText("This is a basic PDF conversion.", {
+        x: 50,
+        y: height - 110,
+        size: 10,
+        color: rgb(0, 0, 0),
+      });
+      page.drawText(
+        "For full formatting preservation, consider server-side conversion.",
+        {
+          x: 50,
+          y: height - 130,
+          size: 10,
+          color: rgb(0.5, 0.5, 0.5),
+        }
+      );
+      const pdfBytes = await pdfDoc.save();
+      const pdfBlob = new Blob([pdfBytes], { type: "application/pdf" });
+      const pdfFilename = filename.replace(/\.docx?$/i, "_converted.pdf");
+      setConvertingToPdf(false);
+      return { blob: pdfBlob, filename: pdfFilename };
+    } catch (error) {
+      console.error("Error converting DOCX to PDF:", error);
+      setConvertingToPdf(false);
+      throw error;
+    }
+  };
+
   const isMultiLanguageMode = detectMultiLanguageMode();
+
+  const getFileIcon = (fileName, fileType) => {
+  if (fileType === "application/pdf" || fileName.endsWith(".pdf")) {
+    return <FileText className="w-4 h-4 text-red-400" />;
+  }
+  if (fileType.includes("word") || fileName.match(/\.(doc|docx)$/i)) {
+    return <FileText className="w-4 h-4 text-blue-400" />;
+  }
+  if (fileType.includes("excel") || fileName.match(/\.(xls|xlsx)$/i)) {
+    return <FileText className="w-4 h-4 text-green-400" />;
+  }
+  if (fileType.includes("presentation") || fileName.match(/\.(ppt|pptx)$/i)) {
+    return <FileText className="w-4 h-4 text-orange-400" />;
+  }
+  return <File className="w-4 h-4 text-gray-400" />;
+};
+
+const getStatusIcon = (status) => {
+  switch (status) {
+    case "COMPLETED":
+      return <CheckCircle className="w-4 h-4 text-green-500" />;
+    case "PROCESSING":
+      return <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />;
+    case "FAILED":
+      return <AlertCircle className="w-4 h-4 text-red-500" />;
+    default:
+      return <Clock className="w-4 h-4 text-yellow-500" />;
+  }
+};
+
+const getStatusColor = (status) => {
+  switch (status) {
+    case "COMPLETED":
+      return "text-green-600 bg-green-50 border-green-200";
+    case "PROCESSING":
+      return "text-blue-600 bg-blue-50 border-blue-200";
+    case "FAILED":
+      return "text-red-600 bg-red-50 border-red-200";
+    default:
+      return "text-yellow-600 bg-yellow-50 border-yellow-200";
+  }
+};
+
+const getAccuracyColor = (accuracy) => {
+  if (accuracy >= 80) return "text-green-600 bg-green-50 border-green-200";
+  if (accuracy >= 60) return "text-yellow-600 bg-yellow-50 border-yellow-200";
+  if (accuracy >= 40) return "text-orange-600 bg-orange-50 border-orange-200";
+  return "text-red-600 bg-red-50 border-red-200";
+};
 
   useEffect(() => {
     console.log("Translation Jobs:", translationJobs);
@@ -905,14 +879,6 @@ const Home = ({ user, onBack, onLogout }) => {
                       {Object.keys(groupedJobs).length > 1 ? "s" : ""})
                     </span>
                   </h3>
-                  {/* <button
-                    onClick={refreshEvaluations}
-                    className="flex items-center space-x-2 bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors text-sm"
-                    title="Refresh evaluation data for completed jobs"
-                  >
-                    <TrendingUp className="w-4 h-4" />
-                    <span>Refresh Evaluations</span>
-                  </button> */}
                   <button
                     onClick={handleDownloadAll}
                     className="flex items-center space-x-2 bg-[#062e69] text-white px-4 py-2 rounded-lg hover:bg-[#062e69]/90 transition-colors text-sm"
@@ -1281,7 +1247,7 @@ const Home = ({ user, onBack, onLogout }) => {
       {showPreview && (
         <div className="w-1/2 p-2 bg-white/5 backdrop-blur-sm border-l border-white/10 animate-slide-in-right overflow-y-auto max-h-screen">
           <div className="h-full bg-white/95 backdrop-blur-xl border border-[#062e69]/30 rounded-2xl shadow-lg flex flex-col overflow-y-auto max-h-screen">
-            <div className="flex items-center justify-between p-4 border-b border-[#062e69]/10">
+            <div className="flex items-center justify-between p-2">
               <div className="flex items-center space-x-2">
                 <button
                   onClick={handleClosePreview}
@@ -1290,10 +1256,74 @@ const Home = ({ user, onBack, onLogout }) => {
                 >
                   <X className="w-4 h-4" />
                 </button>
-                <Eye className="w-5 h-5 text-[#062e69]" />
+                {/* <Eye className="w-5 h-5 text-[#062e69]" /> */}
                 <h3 className="text-lg font-semibold text-[#062e69]">
-                  Translation Preview
+                  Select file to preview:
                 </h3>
+
+                {translationJobs.length > 0 && (
+                  <div className="">
+                    <select
+                      value={selectedJobForPreview || ""}
+                      onChange={(e) => setSelectedJobForPreview(e.target.value)}
+                      className="p-2 border border-[#062e69]/30 rounded-lg bg-white text-[#062e69] focus:outline-none focus:border-[#062e69]/50"
+                    >
+                      <option value="">Choose a file...</option>
+                      {translationJobs
+                        .filter(
+                          (job) =>
+                            jobStatuses[job.job_id]?.status === "COMPLETED"
+                        )
+                        .map((job) => {
+                          const evaluation = evaluationData[job.job_id];
+                          return (
+                            <option key={job.job_id} value={job.job_id}>
+                              {job.filename} -{" "}
+                              {job.target_language.toUpperCase()}
+                              {evaluation?.combined_accuracy !== undefined
+                                ? ` (${evaluation.combined_accuracy}% accuracy)`
+                                : ""}
+                            </option>
+                          );
+                        })}
+                    </select>
+                    {selectedJobForPreview &&
+                      evaluationData[selectedJobForPreview] &&
+                      !evaluationData[selectedJobForPreview].error && (
+                        <div className="mt-3 p-3 bg-[#062e69]/5 rounded-lg border border-[#062e69]/10">
+                          <div className="text-xs space-y-1">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[#062e69]/70">
+                                Source Language:
+                              </span>
+                              <span className="font-medium text-[#062e69]">
+                                {evaluationData[selectedJobForPreview]
+                                  .source_language || "N/A"}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-[#062e69]/70">Method:</span>
+                              <span className="font-medium text-[#062e69] text-xs">
+                                {evaluationData[selectedJobForPreview]
+                                  .evaluation_method || "N/A"}
+                              </span>
+                            </div>
+                            {evaluationData[selectedJobForPreview]
+                              .detailed_analysis?.overall_assessment && (
+                              <div className="mt-2 pt-2 border-t border-[#062e69]/10">
+                                <p className="text-[#062e69]/80 text-xs italic">
+                                  {
+                                    evaluationData[selectedJobForPreview]
+                                      .detailed_analysis.overall_assessment
+                                  }
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                  </div>
+                )}
                 {useCJKMode && (
                   <div className="ml-4 px-3 py-1 bg-blue-100 text-blue-800 text-xs rounded-full border border-blue-300">
                     🌏 CJK Mode
@@ -1327,71 +1357,8 @@ const Home = ({ user, onBack, onLogout }) => {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            {translationJobs.length > 0 && (
-              <div className="p-4 border-b border-[#062e69]/10">
-                <label className="text-sm font-medium text-[#062e69]/70 mb-2 block">
-                  Select file to preview:
-                </label>
-                <select
-                  value={selectedJobForPreview || ""}
-                  onChange={(e) => setSelectedJobForPreview(e.target.value)}
-                  className="w-full p-2 border border-[#062e69]/30 rounded-lg bg-white text-[#062e69] focus:outline-none focus:border-[#062e69]/50"
-                >
-                  <option value="">Choose a file...</option>
-                  {translationJobs
-                    .filter(
-                      (job) => jobStatuses[job.job_id]?.status === "COMPLETED"
-                    )
-                    .map((job) => {
-                      const evaluation = evaluationData[job.job_id];
-                      return (
-                        <option key={job.job_id} value={job.job_id}>
-                          {job.filename} - {job.target_language.toUpperCase()}
-                          {evaluation?.combined_accuracy !== undefined
-                            ? ` (${evaluation.combined_accuracy}% accuracy)`
-                            : ""}
-                        </option>
-                      );
-                    })}
-                </select>
-                {selectedJobForPreview &&
-                  evaluationData[selectedJobForPreview] &&
-                  !evaluationData[selectedJobForPreview].error && (
-                    <div className="mt-3 p-3 bg-[#062e69]/5 rounded-lg border border-[#062e69]/10">
-                      <div className="text-xs space-y-1">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[#062e69]/70">
-                            Source Language:
-                          </span>
-                          <span className="font-medium text-[#062e69]">
-                            {evaluationData[selectedJobForPreview]
-                              .source_language || "N/A"}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-[#062e69]/70">Method:</span>
-                          <span className="font-medium text-[#062e69] text-xs">
-                            {evaluationData[selectedJobForPreview]
-                              .evaluation_method || "N/A"}
-                          </span>
-                        </div>
-                        {evaluationData[selectedJobForPreview].detailed_analysis
-                          ?.overall_assessment && (
-                          <div className="mt-2 pt-2 border-t border-[#062e69]/10">
-                            <p className="text-[#062e69]/80 text-xs italic">
-                              {
-                                evaluationData[selectedJobForPreview]
-                                  .detailed_analysis.overall_assessment
-                              }
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-              </div>
-            )}
-            <div className="flex-1 p-4 overflow-y-auto">
+            <></>
+            <div className="flex-1 p-0 overflow-y-auto">
               {useCJKMode &&
               previewUrl &&
               currentPreviewFileType === "application/pdf" ? (
@@ -1467,7 +1434,7 @@ const Home = ({ user, onBack, onLogout }) => {
               ) : previewingFile && previewingFile.type === "docx" ? (
                 <div
                   ref={docxPreviewRef}
-                  className="docx-preview-container bg-white p-4 rounded-lg shadow-inner"
+                  className="docx-preview-container bg-white p-1 pt-0 pb-0 rounded-lg shadow-inner"
                   style={{
                     minHeight: "500px",
                     maxWidth: "100%",
@@ -1494,28 +1461,103 @@ const Home = ({ user, onBack, onLogout }) => {
                 </div>
               )}
             </div>
-            <div className="p-4 border-t border-[#062e69]/10">
-              <button
-                onClick={() =>
-                  selectedJobForPreview && handleDownload(selectedJobForPreview)
-                }
-                disabled={
-                  !selectedJobForPreview ||
-                  !jobStatuses[selectedJobForPreview]?.download_id
-                }
-                className="w-full bg-gradient-to-r from-[#062e69] to-[#062e69]/80 hover:from-[#062e69]/90 hover:to-[#062e69] text-white px-4 py-3 rounded-xl font-medium transition-all duration-200 transform hover:scale-101 hover:shadow-lg hover:shadow-[#062e69]/25 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-              >
-                <Download className="w-4 h-4" />
-                <span>
-                  {selectedJobForPreview
-                    ? `Download ${
-                        translationJobs.find(
-                          (j) => j.job_id === selectedJobForPreview
-                        )?.filename || "File"
-                      }`
-                    : "Select file to download"}
-                </span>
-              </button>
+            <div className="p-1 border-t border-[#062e69]/10">
+              <div className="fixed bottom-14 right-5 z-50 flex items-center gap-3">
+                {hoveredItem && (
+                  <div className="p-2 w-64 bg-gray-900 text-white rounded-lg shadow-2xl animate-fadeIn mt-[30%]">
+                    <p className="text-xs leading-relaxed">
+                      {
+                        legendData.find((item) => item.id === hoveredItem)
+                          ?.description
+                      }
+                    </p>
+                  </div>
+                )}
+                {/* Delta Legend Box */}
+                <div className="bg-white rounded-xl shadow-2xl p-2 max-w-xs border border-gray-200">
+                  <h3 className="text-sm font-bold text-gray-800 mb-2 pb-1 border-b border-gray-200">
+                    Delta Legend
+                  </h3>
+                  <div className="space-y-2 max-h-96 overflow-y-auto">
+                    {legendData.map((item) => (
+                      <div
+                        key={item.id}
+                        className="flex items-center gap-2 p-0 transition-all duration-200 cursor-pointer"
+                        onMouseEnter={() => setHoveredItem(item.id)}
+                        onMouseLeave={() => setHoveredItem(null)}
+                      >
+                        {/* Color Box */}
+                        <div
+                          className="w-4 h-4 rounded shadow-sm flex-shrink-0 transition-transform duration-200 hover:scale-110"
+                          style={{ backgroundColor: item.color }}
+                        />
+                        {/* Label */}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium text-gray-700 hover:text-black truncate">
+                            {item.label}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              {previewingFile && previewingFile.type === "docx" ? (
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => handleDownload(selectedJobForPreview)}
+                    disabled={
+                      !selectedJobForPreview ||
+                      !jobStatuses[selectedJobForPreview]?.download_id
+                    }
+                    className="flex-1 bg-gradient-to-r from-[#062e69] to-[#062e69]/80 hover:from-[#062e69]/90 hover:to-[#062e69] text-white px-4 py-3 rounded-xl font-medium transition-all duration-200 transform hover:scale-101 hover:shadow-lg hover:shadow-[#062e69]/25 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Download Word</span>
+                  </button>
+                  <button
+                    onClick={() => handleDownloadPdf(selectedJobForPreview)}
+                    disabled={
+                      !selectedJobForPreview ||
+                      !jobStatuses[selectedJobForPreview]?.download_id ||
+                      convertingToPdf
+                    }
+                    className="flex-1 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white px-4 py-3 rounded-xl font-medium transition-all duration-200 transform hover:scale-101 hover:shadow-lg hover:shadow-green-500/25 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                  >
+                    {convertingToPdf ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <FileText className="w-4 h-4" />
+                    )}
+                    <span>
+                      {convertingToPdf ? "Converting..." : "Download PDF"}
+                    </span>
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() =>
+                    selectedJobForPreview &&
+                    handleDownload(selectedJobForPreview)
+                  }
+                  disabled={
+                    !selectedJobForPreview ||
+                    !jobStatuses[selectedJobForPreview]?.download_id
+                  }
+                  className="w-full bg-gradient-to-r from-[#062e69] to-[#062e69]/80 hover:from-[#062e69]/90 hover:to-[#062e69] text-white px-4 py-3 rounded-xl font-medium transition-all duration-200 transform hover:scale-101 hover:shadow-lg hover:shadow-[#062e69]/25 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>
+                    {selectedJobForPreview
+                      ? `Download ${
+                          translationJobs.find(
+                            (j) => j.job_id === selectedJobForPreview
+                          )?.filename || "File"
+                        }`
+                      : "Select file to download"}
+                  </span>
+                </button>
+              )}
             </div>
           </div>
         </div>

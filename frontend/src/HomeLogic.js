@@ -44,7 +44,7 @@ const extractLanguagesFromPrompt = (prompt) => {
 
   // Create a list of all possible language identifiers (display names + backend names)
   const languageIdentifiers = [];
-  
+
   Object.entries(LANGUAGE_MAPPING).forEach(([displayName, backendName]) => {
     languageIdentifiers.push({
       displayName,
@@ -73,14 +73,14 @@ const extractLanguagesFromPrompt = (prompt) => {
   // Step 2: Check each segment against all language identifiers
   segments.forEach(segment => {
     if (!segment || segment.length < 3) return; // Skip very short segments
-    
+
     languageIdentifiers.forEach(({ displayName, searchTerms }) => {
       // Check if segment matches any search term
       const isMatch = searchTerms.some(term => {
         // Exact match or segment contains the term as a whole word
-        return segment === term || 
-               segment.includes(term) ||
-               term.includes(segment);
+        return segment === term ||
+          segment.includes(term) ||
+          term.includes(segment);
       });
 
       if (isMatch) {
@@ -176,14 +176,14 @@ export const translationAPI = {
     // Create all API calls in parallel using Promise.all
     const translationPromises = files.map(async (file, index) => {
       console.log(`\n--- Creating parallel request for file ${index + 1}/${files.length}: ${file.name} ---`);
-      
+
       try {
         console.log(`  [${file.name}] Preparing API call...`);
 
         // Create FormData for this file
         const formData = new FormData();
         formData.append('files', file.file);
-        
+
         // Build prompt with target language
         let translationPrompt = `Translate to ${backendLanguageName}`;
         if (prompt.trim()) {
@@ -192,18 +192,18 @@ export const translationAPI = {
         formData.append('prompt', translationPrompt);
         formData.append('target_language', backendLanguageName);
         formData.append('enable_evaluation', 'false');
-        
+
         console.log(`  [${file.name}] Sending parallel API request...`);
         const response = await fetch(`${TRANSLATION_API_BASE_URL}/translate_file_convo`, {
           method: 'POST',
           body: formData,
         });
-        
+
         if (!response.ok) {
           const errorText = await response.text();
           throw new Error(`Translation failed: ${response.status} - ${errorText}`);
         }
-        
+
         const transformedResult = await response.json();
 
         console.log(`  ✅ [${file.name}] Translation API call successful`);
@@ -233,7 +233,7 @@ export const translationAPI = {
 
     console.log(`\n=== PARALLEL Translation Complete ===`);
     console.log(`All ${files.length} API calls completed in ${duration} seconds (parallel execution)`);
-    
+
     // Aggregate all jobs from successful translations
     const allJobs = [];
     results.forEach(result => {
@@ -288,7 +288,7 @@ export const translationAPI = {
     // Create all API calls in parallel using Promise.all
     const translationPromises = languages.map(async (language, index) => {
       console.log(`\n--- Creating parallel request for language ${index + 1}/${languages.length}: ${language} ---`);
-      
+
       try {
         // Backend bypass expects language NAME (e.g., 'french'), not code ('fr')
         // Use LANGUAGE_MAPPING to convert display name to backend name
@@ -302,18 +302,18 @@ export const translationAPI = {
         formData.append('prompt', `Translate to ${backendLanguageName}`);
         formData.append('target_language', backendLanguageName);
         formData.append('enable_evaluation', 'false');
-        
+
         console.log(`  [${language}] Sending parallel API request...`);
         const response = await fetch(`${TRANSLATION_API_BASE_URL}/translate_file_convo`, {
           method: 'POST',
           body: formData,
         });
-        
+
         if (!response.ok) {
           const errorText = await response.text();
           throw new Error(`Translation failed: ${response.status} - ${errorText}`);
         }
-        
+
         const transformedResult = await response.json();
 
         console.log(`  ✅ [${language}] Translation API call successful`);
@@ -343,7 +343,7 @@ export const translationAPI = {
 
     console.log(`\n=== PARALLEL Translation Complete ===`);
     console.log(`All ${languages.length} API calls completed in ${duration} seconds (parallel execution)`);
-    
+
     // Aggregate all jobs from successful translations
     const allJobs = [];
     results.forEach(result => {
@@ -642,9 +642,9 @@ export const useHomeLogic = () => {
   // FIXED: Enhanced Poll job status with better evaluation handling
   const pollJobStatus = async (jobId, filename) => {
     // Intelligent polling with adaptive intervals
-    const maxAttempts = 1000; 
+    const maxAttempts = 1000;
     let attempts = 0;
-    let pollInterval = 5000; 
+    let pollInterval = 5000;
 
     const poll = async () => {
       try {
@@ -701,8 +701,8 @@ export const useHomeLogic = () => {
           } else {
             pollInterval = 15000; // 15 seconds for remaining time
           }
-          
-          console.log(`Job ${jobId} still ${status.status}, checking again in ${pollInterval/1000}s`);
+
+          console.log(`Job ${jobId} still ${status.status}, checking again in ${pollInterval / 1000}s`);
           setTimeout(poll, pollInterval);
         } else {
           const errorMsg = `Translation timeout for ${filename} after ${attempts} attempts (~${Math.floor(attempts * pollInterval / 60000)} minutes)`;
@@ -894,7 +894,7 @@ export const useHomeLogic = () => {
         // Multiple files, single language - use parallel processing
         console.log('=== Multiple Files Single Language Translation (PARALLEL) ===');
         console.log('Files:', uploadedFiles.map(f => f.name));
-        
+
         // Determine target language
         let targetLanguage;
         if (selectedLanguage) {
@@ -913,7 +913,7 @@ export const useHomeLogic = () => {
             throw new Error('Please select a target language or specify it in the prompt');
           }
         }
-        
+
         console.log('Target language:', targetLanguage);
 
         result = await translationAPI.translateMultipleFilesToSingleLanguage(
@@ -1005,7 +1005,7 @@ export const useHomeLogic = () => {
 
     try {
       let targetLang = selectedLanguage;
-      
+
       // If no language selected, try to extract from query
       if (!targetLang) {
         const extractedLanguages = extractLanguagesFromPrompt(query);
@@ -1019,10 +1019,10 @@ export const useHomeLogic = () => {
           return;
         }
       }
-      
+
       // Extract text to translate (remove quotes if present)
       let textToTranslate = query.trim();
-      
+
       // Try to extract quoted text
       const quotedMatch = query.match(/"([^"]+)"|'([^']+)'/);
       if (quotedMatch) {
@@ -1037,10 +1037,10 @@ export const useHomeLogic = () => {
           console.log(`Extracted text from pattern: "${textToTranslate}"`);
         }
       }
-      
+
       // Call the direct text translation endpoint
       const backendLanguage = LANGUAGE_MAPPING[targetLang] || targetLang.toLowerCase();
-      
+
       const response = await fetch(`${TRANSLATION_API_BASE_URL}/translate_text`, {
         method: 'POST',
         headers: {
@@ -1052,11 +1052,11 @@ export const useHomeLogic = () => {
           source_language: null  // Auto-detect
         }),
       });
-      
+
       if (!response.ok) {
         throw new Error(`Translation failed: ${response.status}`);
       }
-      
+
       const result = await response.json();
 
       if (toast) {
@@ -1069,7 +1069,7 @@ export const useHomeLogic = () => {
       }
 
       setTextTranslationResult(result);
-      
+
     } catch (error) {
       console.error("Text translation error:", error);
       const errorMessage = `Translation failed: ${error.message}`;
@@ -1113,13 +1113,13 @@ export const useHomeLogic = () => {
       else if (query.trim()) {
         // Check if language is either selected OR mentioned in the query
         const extractedLanguages = extractLanguagesFromPrompt(query);
-        
+
         if (!selectedLanguage && extractedLanguages.length === 0) {
           const message = "For text-only translation, please select a target language or specify it in your prompt (e.g., 'Translate \"text\" in Dutch')";
           toast ? toast.error(message) : alert(message);
           return;
         }
-        
+
         await handleTranslateText();
       }
     }
@@ -1129,46 +1129,46 @@ export const useHomeLogic = () => {
       console.log("No files uploaded, no translation button - routing to intelligent endpoint");
       setIsTranslating(true);
       const processingToast = toast ? toast.loading("Processing your request...") : null;
-      
+
       try {
         // Send to translation service without files or explicit language
         // Backend Llama will classify intent: chat, translate_text, or other
         const formData = new FormData();
         formData.append('prompt', query);
         // No files, no target_language - forces Llama intent classification
-        
+
         const response = await fetch(`${TRANSLATION_API_BASE_URL}/translate_file_convo`, {
           method: 'POST',
           body: formData
         });
-        
+
         if (response.ok) {
           const data = await response.json();
-          
+
           // Check what intent was detected
           console.log("Backend response data:", data);
           console.log("Detected intent:", data.intent);
-          
+
           if (data.intent === "chat") {
             // Chat response
             const chatReply = data.response || data.message || "Response received";
-            
+
             console.log("Setting chat response state:", {
               query: query,
               response: chatReply,
               intent: "chat",
               source_language: data.source_language || "English"
             });
-            
+
             setChatResponse({
               query: query,
               response: chatReply,
               intent: "chat",
               source_language: data.source_language || "English"
             });
-            
+
             console.log("Chat response state set successfully!");
-            
+
             if (toast) {
               toast.update(processingToast, {
                 render: "✅ Response received - Check below for full answer",
@@ -1180,7 +1180,7 @@ export const useHomeLogic = () => {
           } else if (data.intent === "translate_text") {
             // Text translation response
             setTextTranslationResult(data);
-            
+
             if (toast) {
               toast.update(processingToast, {
                 render: data.message || "Translation complete",
@@ -1224,7 +1224,7 @@ export const useHomeLogic = () => {
       }
       return;
     }
-    
+
     // Fallback for edge cases
     if (query.trim()) {
       try {
@@ -1567,29 +1567,47 @@ export const useHomeLogic = () => {
   };
 
   const testCases = [
-  "chinese japanese",
-  "chinese and japanese",
-  "chinese,japanese",
-  "chinese , japanese",
-  "Translate to German, French, and Spanish",
-  "Translate to simplified chinese and japanese",
-  "german french spanish italian",
-  "Please translate this to Korean and Swedish",
-  "chinese",
-  "translate to chinese, japanese, korean",
-  "german,french,spanish,italian,english",
-  "CHINESE JAPANESE GERMAN",
-  "Translate document to french and german languages",
-  "Translate these file into German and French",
-];
+    "chinese japanese",
+    "chinese and japanese",
+    "chinese,japanese",
+    "chinese , japanese",
+    "Translate to German, French, and Spanish",
+    "Translate to simplified chinese and japanese",
+    "german french spanish italian",
+    "Please translate this to Korean and Swedish",
+    "chinese",
+    "translate to chinese, japanese, korean",
+    "german,french,spanish,italian,english",
+    "CHINESE JAPANESE GERMAN",
+    "Translate document to french and german languages",
+    "Translate these file into German and French",
+  ];
 
-console.log("Testing Enhanced Language Extraction:\n");
-testCases.forEach(testCase => {
-  const extracted = extractLanguagesFromPrompt(testCase);
-  console.log(`Input: "${testCase}"`);
-  console.log(`Extracted: [${extracted.join(', ')}]`);
-  console.log(`Count: ${extracted.length}\n`);
-});
+  // console.log("Testing Enhanced Language Extraction:\n");
+  // testCases.forEach(testCase => {
+  //   const extracted = extractLanguagesFromPrompt(testCase);
+  //   console.log(`Input: "${testCase}"`);
+  //   console.log(`Extracted: [${extracted.join(', ')}]`);
+  //   console.log(`Count: ${extracted.length}\n`);
+  // });
+
+  const containsCJK = (text) => {
+    const cjkRegex = /[\u2E80-\u2EFF\u2F00-\u2FDF\u3040-\u309F\u30A0-\u30FF\u3100-\u312F\u3200-\u32FF\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/;
+    return cjkRegex.test(text);
+  };
+
+  const isPotentiallyCJK = (filename, targetLanguage = "") => {
+  const cjkLanguages = [ "chinese", "japanese", "korean", "zh", "ja", "ko", "cn", "jp", "kr", "中文", "日本語", "한국어" ];
+  const lowerFilename = filename.toLowerCase();
+  const lowerLanguage = targetLanguage.toLowerCase();
+  return cjkLanguages.some(
+    (lang) =>
+      lowerFilename.includes(lang) ||
+      lowerLanguage.includes(lang) ||
+      containsCJK(filename) ||
+      containsCJK(targetLanguage)
+  );
+  };
 
   return {
     percentage,
@@ -1637,8 +1655,9 @@ testCases.forEach(testCase => {
     handleDownloadAll,
     detectCJKLanguage,
     fetchEvaluation,
-    extractLanguagesFromPrompt, 
-    LANGUAGE_MAPPING, 
-    refreshEvaluations
+    extractLanguagesFromPrompt,
+    LANGUAGE_MAPPING,
+    refreshEvaluations,
+    isPotentiallyCJK
   };
 };

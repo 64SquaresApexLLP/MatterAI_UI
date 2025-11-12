@@ -1,9 +1,7 @@
 import { API_BASE_URL, API_ENDPOINTS, HTTP_METHODS } from "./config.js";
 
-// Token management
 let authToken = localStorage.getItem("authToken");
 
-// Initialize token on module load
 if (authToken) {
   console.log(
     "Auth token loaded from localStorage:",
@@ -24,7 +22,6 @@ export const setAuthToken = (token) => {
 
 export const getAuthToken = () => authToken;
 
-// Generic API call function
 const apiCall = async (endpoint, options = {}) => {
   const url = `${API_BASE_URL}${endpoint}`;
 
@@ -61,8 +58,7 @@ const apiCall = async (endpoint, options = {}) => {
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       console.error("API call failed:", response.status, errorData);
-
-      // Extract the error message from backend response
+      
       const errorMessage =
         errorData.detail ||
         errorData.message ||

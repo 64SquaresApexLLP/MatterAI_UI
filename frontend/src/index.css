@@ -8,6 +8,7 @@ button {
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
@@ -18,6 +19,7 @@ button {
     opacity: 0;
     transform: translateY(30px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -29,6 +31,7 @@ button {
     opacity: 0;
     transform: translateY(-10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -50,18 +53,23 @@ button {
 .delay-100 {
   animation-delay: 0.1s;
 }
+
 .delay-200 {
   animation-delay: 0.2s;
 }
+
 .delay-300 {
   animation-delay: 0.3s;
 }
+
 .delay-400 {
   animation-delay: 0.4s;
 }
+
 .delay-600 {
   animation-delay: 0.6s;
 }
+
 .delay-1000 {
   animation-delay: 1s;
 }
@@ -71,6 +79,7 @@ button {
     transform: translateX(100%);
     opacity: 0;
   }
+
   to {
     transform: translateX(0);
     opacity: 1;
@@ -86,6 +95,7 @@ button {
     opacity: 0;
     transform: translateY(10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -101,6 +111,7 @@ button {
     opacity: 0;
     transform: translateY(20px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -128,6 +139,7 @@ button {
     transform: translateX(100%);
     opacity: 0;
   }
+
   to {
     transform: translateX(0);
     opacity: 1;
@@ -138,6 +150,7 @@ button {
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
@@ -148,6 +161,7 @@ button {
     transform: translateY(20px);
     opacity: 0;
   }
+
   to {
     transform: translateY(0);
     opacity: 1;
@@ -184,14 +198,14 @@ button {
 
 .docx-wrapper {
   background: white;
-  padding: 40px;
-  box-shadow: 0 0 10px rgba(0,0,0,0.1);
+  padding: 10px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
 }
 
 .docx-wrapper section.docx {
-  margin-bottom: 20px;
+  margin-bottom: 10px;
   background: white;
-  padding: 20px;
+  padding: 10px;
 }
 
 .docx-wrapper p {
@@ -212,25 +226,26 @@ button {
 }
 
 .docx-preview-container {
-  font-family: 'Noto Sans CJK JP', 'Noto Sans CJK SC', 'Noto Sans CJK KR', 
-               'MS Gothic', 'Yu Gothic', 'Meiryo', 'SimSun', 'Microsoft YaHei', 
-               'Malgun Gothic', sans-serif;
+  font-family: 'Noto Sans CJK JP', 'Noto Sans CJK SC', 'Noto Sans CJK KR',
+    'MS Gothic', 'Yu Gothic', 'Meiryo', 'SimSun', 'Microsoft YaHei',
+    'Malgun Gothic', sans-serif;
 }
 
 /* For PDF text layers */
 .react-pdf__Page__textContent {
-  font-family: 'Noto Sans CJK JP', 'Noto Sans CJK SC', 'Noto Sans CJK KR', 
-               'MS Gothic', 'Yu Gothic', 'Meiryo', 'SimSun', 'Microsoft YaHei', 
-               'Malgun Gothic', sans-serif !important;
+  font-family: 'Noto Sans CJK JP', 'Noto Sans CJK SC', 'Noto Sans CJK KR',
+    'MS Gothic', 'Yu Gothic', 'Meiryo', 'SimSun', 'Microsoft YaHei',
+    'Malgun Gothic', sans-serif !important;
 }
 
 .react-pdf__Document {
-  font-family: 'Noto Sans CJK SC', 'Noto Sans CJK TC', 'Noto Sans CJK JP', 
-               'Noto Sans CJK KR', 'SimSun', 'MS Mincho', 'Malgun Gothic', 
-               'Yu Gothic', sans-serif;
+  font-family: 'Noto Sans CJK SC', 'Noto Sans CJK TC', 'Noto Sans CJK JP',
+    'Noto Sans CJK KR', 'SimSun', 'MS Mincho', 'Malgun Gothic',
+    'Yu Gothic', sans-serif;
 }
 
-.pdfViewer .textLayer, .textLayer {
+.pdfViewer .textLayer,
+.textLayer {
   font-family: "NotoSansCJK", "Noto Sans", sans-serif !important;
   white-space: pre-wrap;
 }
@@ -254,3 +269,19 @@ iframe[src^="blob:"] {
 /* iframe[src^="blob:"] {
   font-family: 'Noto Sans CJK SC', 'SimSun', 'MS Mincho', 'Yu Gothic', 'Malgun Gothic', sans-serif !important;
 } */
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.2s ease-out;
+}
