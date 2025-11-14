@@ -924,7 +924,7 @@ export const useHomeLogic = () => {
           uploadedFiles,
           targetLanguage,
           query.trim()
-        );
+        ); 
       } else {
                 // --- URGENT FIX: Ensure Target Language is explicitly sent to the API ---
                 
