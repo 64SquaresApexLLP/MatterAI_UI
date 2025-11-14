@@ -569,6 +569,10 @@ export const useHomeLogic = () => {
   const [previewFileType, setPreviewFileType] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
 
+  const [selectedTargetFileType, setSelectedTargetFileType] = useState(null);
+  const [showFileTypeDropdown, setShowFileTypeDropdown] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(true);
+
   useEffect(() => {
     const randomPercentage = Math.floor(Math.random() * (90 - 80 + 1)) + 80;
     setPercentage(randomPercentage);
@@ -921,27 +925,39 @@ export const useHomeLogic = () => {
           targetLanguage,
           query.trim()
         );
-
       } else {
-        // Standard logic: single file single language or multiple files with complex prompt
-        let translationPrompt;
-        if (selectedLanguage) {
-          const backendLanguage = LANGUAGE_MAPPING[selectedLanguage] || selectedLanguage.toLowerCase();
-          translationPrompt = `Translate to ${backendLanguage}`;
+                // --- URGENT FIX: Ensure Target Language is explicitly sent to the API ---
+                
+                // 1. Determine the Single Target Language
+                let targetLanguage = selectedLanguage;
+                if (!targetLanguage && extractedLanguages.length === 1) {
+                  targetLanguage = extractedLanguages[0];
+                }
 
-          if (query.trim()) {
-            translationPrompt += `. ${query.trim()}`;
-          }
-        } else {
-          translationPrompt = query.trim();
-        }
+                if (targetLanguage) {
+                  // Get the backend-safe language name (e.g., "German" -> "german")
+                  const backendLanguage = LANGUAGE_MAPPING[targetLanguage] || targetLanguage.toLowerCase();
+                  
+                  console.log('=== Standard Translation Request - FORCING TARGET LANGUAGE ===');
+                  console.log('Target Language:', backendLanguage);
+                  console.log('Number of files:', uploadedFiles.length);
 
-        console.log('=== Standard Translation Request ===');
-        console.log('Translation prompt:', translationPrompt);
-        console.log('Number of files:', uploadedFiles.length);
+                  // 2. Use a robust API call that sends the explicit target_language parameter
+                  // NOTE: This assumes you use the translateMultipleFilesToSingleLanguage API (which already exists in your code)
+                  result = await translationAPI.translateMultipleFilesToSingleLanguage(
+                    uploadedFiles,
+                    backendLanguage, // Passes 'german' or 'french' as the explicit target_language
+                    query.trim() // Passes the original prompt
+                  );
 
-        result = await translationAPI.translateFileConvoWithPrompt(uploadedFiles, translationPrompt);
-      }
+                } else {
+                  // 3. Fallback: Use conversational prompt only if NO clear target language was found
+                  console.log('=== Standard Translation Request - CONVERSATIONAL FALLBACK (No clear language) ===');
+                  console.log('Translation prompt:', query.trim());
+                  
+                  result = await translationAPI.translateFileConvoWithPrompt(uploadedFiles, query.trim());
+                }
+              }
 
       console.log('=== Translation Response ===');
       console.log('Response:', result.response);
@@ -1258,6 +1274,31 @@ export const useHomeLogic = () => {
 
   const handleFileUpload = async (files) => {
     const fileArray = Array.from(files);
+
+    if (selectedButton === "File_Converter") {
+    const validFiles = fileArray.filter(file => {
+      const validTypes = ['application/pdf', 'application/msword', 
+                         'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+      return validTypes.includes(file.type) || file.name.match(/\.(pdf|doc|docx)$/i);
+    });
+
+    if (validFiles.length === 0) {
+      toast.error("Please upload PDF or Word documents only");
+      return;
+    }
+
+    const fileObjects = validFiles.map(file => ({
+      id: Date.now() + Math.random(),
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      file: file
+    }));
+
+    setUploadedFiles(fileObjects);
+    toast.success(`${fileObjects.length} file(s) ready for conversion`);
+    return;
+  }
 
     if (selectedButton === "Translation") {
       // For translation mode, ONLY handle files locally - no server upload
@@ -1609,6 +1650,63 @@ export const useHomeLogic = () => {
   );
   };
 
+  const handleFileConversion = async (selectedTargetFileType) => {
+  console.log('=== File Conversion Debug ===');
+  console.log('Uploaded files:', uploadedFiles);
+  console.log('Selected target type (passed as param):', selectedTargetFileType);
+  
+  if (!uploadedFiles.length) {
+    alert("Please upload a file first.");
+    return;
+  }
+  
+  if (!selectedTargetFileType) {
+    alert("Please select a target format (PDF or DOCX).");
+    return;
+  }
+
+  const file = uploadedFiles[0];
+  console.log('Converting file:', file.name, 'to:', selectedTargetFileType);
+
+  const formData = new FormData();
+  formData.append("file", file.file);
+  formData.append("target_format", selectedTargetFileType);
+
+  try {
+    setIsTranslating(true);
+    console.log('Sending conversion request...');
+    
+    const response = await fetch(import.meta.env.VITE_API_BASE_URL + "/convert_file", {
+      method: "POST",
+      body: formData,
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Conversion failed: ${response.status} - ${errorText}`);
+    }
+    
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.style.display = 'none';
+    a.href = url;
+    a.download = file.name.replace(/\.[^/.]+$/, '') + '.' + selectedTargetFileType;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+    
+    toast.success("File converted successfully!");
+    
+  } catch (err) {
+    console.error('Conversion error:', err);
+    toast.error(`Conversion failed: ${err.message}`);
+  } finally {
+    setIsTranslating(false);
+  }
+};
+
   return {
     percentage,
     query,
@@ -1658,6 +1756,14 @@ export const useHomeLogic = () => {
     extractLanguagesFromPrompt,
     LANGUAGE_MAPPING,
     refreshEvaluations,
-    isPotentiallyCJK
+    isPotentiallyCJK,
+    handleFileConversion,
+    selectedTargetFileType,
+    setSelectedTargetFileType,
+    showFileTypeDropdown,
+    setShowFileTypeDropdown,
+    handleFileConversion,
+    isExpanded,
+    setIsExpanded
   };
 };

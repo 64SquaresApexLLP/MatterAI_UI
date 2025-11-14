@@ -1,6 +1,6 @@
 // Imports.jsx
 import React, { useState, useRef, useEffect } from "react";
-import { Send, Mic, Paperclip, X, FileText, File, LogOut, User, Languages, Download, Eye, Loader2, CheckCircle, Upload, Bell, BellOff, Clock, AlertCircle, DownloadCloud, TrendingUp, AlertTriangle, Info, Globe, Copy, MessageCircle } from "lucide-react";
+import { Send, Mic, Paperclip, X, FileText, File, LogOut, User, Languages, Download, Eye, Loader2, CheckCircle, Upload, Bell, BellOff, Clock, AlertCircle, DownloadCloud, TrendingUp, AlertTriangle, Info, Globe, Copy, MessageCircle, FileSymlink } from "lucide-react";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import TimesheetForm from "./TimesheetForm";
@@ -18,4 +18,4 @@ import docxPdf from 'docx-pdf';
 import { Packer, Paragraph, TextRun } from 'docx';
 import { PDFDocument, rgb } from 'pdf-lib';
 
-export { React, useState, useRef, useEffect, Send, Mic, Paperclip, X, FileText, File, LogOut, User, Languages, Download, Eye, Loader2, CheckCircle, Upload, Bell, BellOff, Clock, AlertCircle, DownloadCloud, TrendingUp, AlertTriangle, Info, Globe, Copy, MessageCircle, ToastContainer, TimesheetForm, TimesheetEntries, useHomeLogic, notificationHelper, languages, formatFileSize, TimesheetOptions, Document, Page, pdfjs, pdfjsLib, renderAsync, loadNotoCJK, previewCJKPdf, docxPdf, Packer, Paragraph, TextRun, PDFDocument, rgb };
+export { React, useState, useRef, useEffect, Send, Mic, Paperclip, X, FileText, File, LogOut, User, Languages, Download, Eye, Loader2, CheckCircle, Upload, Bell, BellOff, Clock, AlertCircle, DownloadCloud, TrendingUp, AlertTriangle, Info, Globe, Copy, MessageCircle, FileSymlink, ToastContainer, TimesheetForm, TimesheetEntries, useHomeLogic, notificationHelper, languages, formatFileSize, TimesheetOptions, Document, Page, pdfjs, pdfjsLib, renderAsync, loadNotoCJK, previewCJKPdf, docxPdf, Packer, Paragraph, TextRun, PDFDocument, rgb };

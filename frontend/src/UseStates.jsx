@@ -18,6 +18,9 @@ const UseStates = () => {
   const [showFileSelector, setShowFileSelector] = useState(false);
   const [convertingToPdf, setConvertingToPdf] = useState(false);
   const [hoveredItem, setHoveredItem] = useState(null);
+  const [selectedTargetFileType, setSelectedTargetFileType] = useState(null);
+  const [showFileTypeDropdown, setShowFileTypeDropdown] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(true);
 
   return {
     numPages,
@@ -51,6 +54,12 @@ const UseStates = () => {
     setConvertingToPdf,
     hoveredItem,
     setHoveredItem,
+    selectedTargetFileType,
+    setSelectedTargetFileType,
+    showFileTypeDropdown,
+    setShowFileTypeDropdown,
+    isExpanded,
+    setIsExpanded
   };
 };
 

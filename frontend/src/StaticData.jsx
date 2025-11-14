@@ -88,4 +88,15 @@ const pdfOptions = {
   verbosity: 1,
 };
 
-export {jurisdictions, jurisdictionPrompts, legendData, pdfOptions}
+const fileTypeOptions = {
+  Translation: [],
+  File_Converter: [
+    { value: "pdf", label: "PDF", icon: "📄" },
+    { value: "docx", label: "Word (DOCX)", icon: "📝" },
+  ],
+  Timesheet: [],
+  Matters: [],
+  Entries: [],
+};
+
+export {jurisdictions, jurisdictionPrompts, legendData, pdfOptions, fileTypeOptions}

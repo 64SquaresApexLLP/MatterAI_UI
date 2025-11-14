@@ -9,6 +9,7 @@ from query_routes import router as query_router
 from timesheet_routes import router as timesheet_router, chatbot_router
 from file_routes import router as file_router
 from database_setup import initialize_database
+from file_converter_routes import router as file_converter_router
 
 # Create FastAPI app with metadata
 app = FastAPI(
@@ -45,6 +46,7 @@ app.include_router(query_router)
 app.include_router(timesheet_router)
 app.include_router(chatbot_router)
 app.include_router(file_router)
+app.include_router(file_converter_router)
 
 # Root endpoint
 @app.get("/")

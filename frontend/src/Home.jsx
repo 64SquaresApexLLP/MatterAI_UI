@@ -1,11 +1,11 @@
-import { React, useState, useRef, useEffect, Send, Mic, Paperclip, X, FileText, File, LogOut, User, Languages, Download, Eye, Loader2, CheckCircle, Upload, Bell, BellOff, Clock, AlertCircle, DownloadCloud, TrendingUp, AlertTriangle, Info, Globe, Copy, MessageCircle, ToastContainer, TimesheetForm, TimesheetEntries, useHomeLogic, notificationHelper, languages, formatFileSize, TimesheetOptions, Document, Page, pdfjs, pdfjsLib, renderAsync, loadNotoCJK, previewCJKPdf, docxPdf, Packer, Paragraph, TextRun, PDFDocument, rgb } from "./Imports.jsx";
-import { jurisdictions, jurisdictionPrompts, legendData, pdfOptions } from "./StaticData.jsx";
+import { React, useState, useRef, useEffect, Send, Mic, Paperclip, X, FileText, File, LogOut, User, Languages, Download, Eye, Loader2, CheckCircle, Upload, Bell, BellOff, Clock, AlertCircle, DownloadCloud, TrendingUp, AlertTriangle, Info, Globe, Copy, MessageCircle, FileSymlink, ToastContainer, TimesheetForm, TimesheetEntries, useHomeLogic, notificationHelper, languages, formatFileSize, TimesheetOptions, Document, Page, pdfjs, pdfjsLib, renderAsync, loadNotoCJK, previewCJKPdf, docxPdf, Packer, Paragraph, TextRun, PDFDocument, rgb } from "./Imports.jsx";
+import { jurisdictions, jurisdictionPrompts, legendData, pdfOptions, fileTypeOptions } from "./StaticData.jsx";
 import UseStates from "./UseStates.jsx";
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
 const Home = ({ user, onBack, onLogout }) => {
-  const { percentage, query, setQuery, selectedButton, selectedLanguage, showLanguageDropdown, setShowLanguageDropdown, uploadedFiles, setUploadedFiles, isDragOver, isTranslating, translationResult, translationJobs, jobStatuses, evaluationData, previewText, showPreview, setShowPreview, fileInputRef, showTimesheet, setShowTimesheet, showEntries, setShowEntries, isListening, textTranslationResult, setTextTranslationResult, chatResponse, setChatResponse, notificationPermission, handleRequestNotificationPermission, previewFile, previewFileType, toggleListening, handleButtonClick, handleLanguageSelect, handleSubmit, handleFileInputChange, handleDragOver, handleDragLeave, handleDrop, removeFile, handleDownload, handleDownloadAll, fetchEvaluation, refreshEvaluations, extractLanguagesFromPrompt, LANGUAGE_MAPPING, isPotentiallyCJK } = useHomeLogic();
-  const { numPages, setNumPages, pageNumber, setPageNumber, selectedJobForPreview, setSelectedJobForPreview, previewingFile, setPreviewingFile, showEvaluationDetails, setShowEvaluationDetails, previewUrl, setPreviewUrl, currentPreviewFileType, setCurrentPreviewFileType, useCJKMode, setUseCJKMode, showJurisdictionDropdown, setShowJurisdictionDropdown, docxPreviewRef, selectedJurisdiction, setSelectedJurisdiction, showPromptSection, setShowPromptSection, showOptionsSection, setShowOptionsSection, showFileSelector, setShowFileSelector, convertingToPdf, setConvertingToPdf, hoveredItem, setHoveredItem } = UseStates();
+  const { percentage, query, setQuery, selectedButton, selectedLanguage, showLanguageDropdown, setShowLanguageDropdown, uploadedFiles, setUploadedFiles, isDragOver, isTranslating, translationResult, translationJobs, jobStatuses, evaluationData, previewText, showPreview, setShowPreview, fileInputRef, showTimesheet, setShowTimesheet, showEntries, setShowEntries, isListening, textTranslationResult, setTextTranslationResult, chatResponse, setChatResponse, notificationPermission, handleRequestNotificationPermission, previewFile, previewFileType, toggleListening, handleButtonClick, handleLanguageSelect, handleSubmit, handleFileInputChange, handleDragOver, handleDragLeave, handleDrop, removeFile, handleDownload, handleDownloadAll, fetchEvaluation, refreshEvaluations, extractLanguagesFromPrompt, LANGUAGE_MAPPING, isPotentiallyCJK, handleFileConversion } = useHomeLogic();
+  const { numPages, setNumPages, pageNumber, setPageNumber, selectedJobForPreview, setSelectedJobForPreview, previewingFile, setPreviewingFile, showEvaluationDetails, setShowEvaluationDetails, previewUrl, setPreviewUrl, currentPreviewFileType, setCurrentPreviewFileType, useCJKMode, setUseCJKMode, showJurisdictionDropdown, setShowJurisdictionDropdown, docxPreviewRef, selectedJurisdiction, setSelectedJurisdiction, showPromptSection, setShowPromptSection, showOptionsSection, setShowOptionsSection, showFileSelector, setShowFileSelector, convertingToPdf, setConvertingToPdf, hoveredItem, setHoveredItem, selectedTargetFileType, setSelectedTargetFileType, showFileTypeDropdown, setShowFileTypeDropdown, isExpanded, setIsExpanded } = UseStates();
 
   useEffect(() => {
     setShowFileSelector(translationJobs.length > 0);
@@ -431,7 +431,7 @@ const getAccuracyColor = (accuracy) => {
       />
       {notificationHelper.isSupported() &&
         notificationPermission !== "granted" && (
-          <div className="fixed top-20 right-4 z-50">
+          <div className="fixed top-18 right-4 z-50">
             <button
               onClick={handleRequestNotificationPermission}
               className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg transition-colors"
@@ -548,6 +548,8 @@ const getAccuracyColor = (accuracy) => {
                   placeholder={
                     selectedButton === "Translation"
                       ? "Enter translation instructions (e.g., 'Translate to Spanish, French, and German') or select language..."
+                      : selectedButton === "File_Converter"
+                      ? "Convert file to Word/PDF..."
                       : "Case related questions..."
                   }
                   className="flex-1 bg-transparent text-[#062e69] placeholder-[#062e69]/50 focus:outline-none text-lg font-medium"
@@ -648,16 +650,63 @@ const getAccuracyColor = (accuracy) => {
                     </div>
                   </div>
                 )}
+
+        {selectedButton === "File_Converter" && (
+          <div className="relative flex mr-1">
+            <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowFileTypeDropdown(!showFileTypeDropdown)}
+                  className="p-2 text-[#062e69]/70 hover:text-[#062e69] transition-colors duration-200 hover:bg-[#062e69]/10 rounded-lg flex items-center space-x-1"
+                  title="Select Target File Type"
+                >
+                  <FileText className="w-5 h-5" />
+                  {selectedTargetFileType ? (
+                    <span className="text-sm font-medium max-w-20 truncate">
+                      {fileTypeOptions.File_Converter.find(
+                        (ft) => ft.value === selectedTargetFileType
+                      )?.label || "File Type"}
+                    </span>
+                  ) : (
+                    <span className="text-sm text-[#062e69]/50">Target Format</span>
+                  )}
+                </button>
+                {showFileTypeDropdown && (
+  <div className="absolute bottom-full right-0 mb-2 w-48 bg-white/95 backdrop-blur-xl border border-[#062e69]/30 rounded-xl shadow-xl z-30 max-h-60 overflow-y-auto">
+    <div className="p-2">
+      <div className="text-[#062e69] font-medium text-sm mb-2 px-2">
+        Select Target Format
+      </div>
+      {['pdf', 'docx'].map((format) => (
+  <button
+    key={format}
+    onClick={() => {
+      console.log('Setting target file type to:', format);
+      setSelectedTargetFileType(format);
+      setShowFileTypeDropdown(false);
+      console.log('After setting - selectedTargetFileType:', format);
+    }}
+    className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-all duration-200 ${
+      selectedTargetFileType === format
+        ? "bg-[#062e69] text-white"
+        : "text-[#062e69] hover:bg-[#062e69]/10"
+    }`}
+  >
+    {format.toUpperCase()}
+  </button>
+))}
+    </div>
+  </div>
+)}
+                  </div>
+                </div>
+                )}
                 <input
                   type="file"
                   ref={fileInputRef}
                   onChange={handleFileInputChange}
                   multiple={!isMultiLanguageMode}
-                  accept={
-                    selectedButton === "Translation"
-                      ? ".pdf,.docx,.pptx"
-                      : ".pdf,.doc,.docx,.txt,.xls,.xlsx"
-                  }
+                  accept={selectedButton === "Translation" ? ".pdf,.docx,.pptx" : selectedButton === "File_Converter" ? ".pdf,.doc,.docx" : ".pdf,.doc,.docx,.txt,.xls,.xlsx"}
                   className="hidden"
                 />
                 <button
@@ -667,44 +716,43 @@ const getAccuracyColor = (accuracy) => {
                   title={
                     selectedButton === "Translation"
                       ? "Upload files (PDF, DOCX, PPTX only)"
+                      : selectedButton === "File_Converter"
+                      ? "Upload files (PDF, DOC, DOCX only)"
                       : "Upload files"
                   }
                 >
                   <Paperclip className="w-5 h-5" />
                 </button>
                 <button
-                  type="button"
-                  onClick={toggleListening}
-                  className={`flex-shrink-0 mr-2 p-2 rounded-lg transition-all duration-200 ${
-                    isListening
-                      ? "text-red-500 bg-red-500/20 animate-pulse"
-                      : "text-[#062e69]/70 hover:text-[#062e69] hover:bg-[#062e69]/10"
-                  }`}
-                  title={isListening ? "Stop Listening" : "Start Listening"}
+                  // onClick={selectedButton === "File_Converter" ? handleFileConversion : handleSubmit}
+                  onClick={selectedButton === "File_Converter" ? () => handleFileConversion(selectedTargetFileType) : handleSubmit}
+                  disabled={
+                    isTranslating || 
+                    (selectedButton === "File_Converter" && (!uploadedFiles.length || !selectedTargetFileType))
+                  }
+                  className="ml-2 flex-shrink-0 bg-gradient-to-r from-[#062e69] to-[#062e69]/80 hover:from-[#062e69]/90 hover:to-[#062e69] text-white px-3 py-2 rounded-xl font-medium transition-all duration-200 transform hover:scale-105 hover:shadow-lg hover:shadow-[#062e69]/25 flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                 >
-                  <Mic className="w-5 h-5" />
-                </button>
-                <button
-                  onClick={handleSubmit}
-                  disabled={isTranslating}
-                  className="flex-shrink-0 bg-gradient-to-r from-[#062e69] to-[#062e69]/80 hover:from-[#062e69]/90 hover:to-[#062e69] text-white px-3 py-2 rounded-xl font-medium transition-all duration-200 transform hover:scale-105 hover:shadow-lg hover:shadow-[#062e69]/25 flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-                >
-                  {isTranslating ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Processing...</span>
-                    </>
-                  ) : selectedButton === "Translation" ? (
-                    <>
-                      <span>Translate</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>Ask</span>
-                      <Send className="w-4 h-4" />
-                    </>
-                  )}
-                </button>
+              {isTranslating ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Processing...</span>
+                </>
+              ) : selectedButton === "Translation" ? (
+                <>
+                  <span>Translate</span>
+                </>
+              ) : selectedButton === "File_Converter" ? (
+                <>
+                  <span>Convert to {selectedTargetFileType?.toUpperCase()}</span>
+                  <FileSymlink className="w-5 h-5" />
+                </>
+              ) : (
+                <>
+                  <span>Ask</span>
+                  <Send className="w-4 h-4" />
+                </>
+              )}
+            </button>
               </div>
               {isDragOver && (
                 <div className="absolute inset-0 bg-[#062e69]/10 backdrop-blur-sm rounded-2xl border-2 border-dashed border-[#062e69]/50 flex items-center justify-center z-10">
@@ -1136,6 +1184,16 @@ const getAccuracyColor = (accuracy) => {
             >
               Entries
             </button>
+            <button
+              onClick={() => handleButtonClick("File_Converter")}
+              className={`group backdrop-blur-xl border font-medium transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-[#062e69]/25 px-6 py-3 rounded-xl ${
+                selectedButton === "File_Converter"
+                  ? "bg-blue-900 text-white border-[#062e69] shadow-lg"
+                  : "bg-white/90 border-[#062e69]/30 hover:border-[#062e69]/50 text-[#062e69]"
+              }`}
+            >
+              File Converter
+            </button>
           </div>
           {chatResponse && (
             <div className="mt-8 animate-slide-up delay-500">
@@ -1244,7 +1302,7 @@ const getAccuracyColor = (accuracy) => {
           )}
         </div>
       </div>
-      {showPreview && (
+      {showPreview && ( 
         <div className="w-1/2 p-2 bg-white/5 backdrop-blur-sm border-l border-white/10 animate-slide-in-right overflow-y-auto max-h-screen">
           <div className="h-full bg-white/95 backdrop-blur-xl border border-[#062e69]/30 rounded-2xl shadow-lg flex flex-col overflow-y-auto max-h-screen">
             <div className="flex items-center justify-between p-2">
@@ -1475,32 +1533,40 @@ const getAccuracyColor = (accuracy) => {
                 )}
                 {/* Delta Legend Box */}
                 <div className="bg-white rounded-xl shadow-2xl p-2 max-w-xs border border-gray-200">
-                  <h3 className="text-sm font-bold text-gray-800 mb-2 pb-1 border-b border-gray-200">
-                    Delta Legend
-                  </h3>
-                  <div className="space-y-2 max-h-96 overflow-y-auto">
-                    {legendData.map((item) => (
-                      <div
-                        key={item.id}
-                        className="flex items-center gap-2 p-0 transition-all duration-200 cursor-pointer"
-                        onMouseEnter={() => setHoveredItem(item.id)}
-                        onMouseLeave={() => setHoveredItem(null)}
-                      >
-                        {/* Color Box */}
-                        <div
-                          className="w-4 h-4 rounded shadow-sm flex-shrink-0 transition-transform duration-200 hover:scale-110"
-                          style={{ backgroundColor: item.color }}
-                        />
-                        {/* Label */}
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-medium text-gray-700 hover:text-black truncate">
-                            {item.label}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+      <div
+        className="flex justify-between items-center cursor-pointer"
+        onClick={() => setIsExpanded(!isExpanded)}
+      >
+        <h3 className="text-sm font-bold text-gray-800 mb-0 pb-0 pr-2">
+          Delta Legend
+        </h3>
+        <button className="text-gray-500 hover:text-gray-700 focus:outline-none pb-1">
+          {isExpanded ? '−' : '+'}
+        </button>
+      </div>
+      {isExpanded && (
+        <div className="space-y-2 max-h-96 overflow-y-auto">
+          {legendData.map((item) => (
+            <div
+              key={item.id}
+              className="flex items-center gap-2 p-0 transition-all duration-200 cursor-pointer"
+              onMouseEnter={() => setHoveredItem(item.id)}
+              onMouseLeave={() => setHoveredItem(null)}
+            >
+              <div
+                className="w-4 h-4 rounded shadow-sm flex-shrink-0 transition-transform duration-200 hover:scale-110"
+                style={{ backgroundColor: item.color }}
+              />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium text-gray-700 hover:text-black truncate">
+                  {item.label}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
               </div>
               {previewingFile && previewingFile.type === "docx" ? (
                 <div className="flex space-x-2">
@@ -1544,7 +1610,7 @@ const getAccuracyColor = (accuracy) => {
                     !selectedJobForPreview ||
                     !jobStatuses[selectedJobForPreview]?.download_id
                   }
-                  className="w-full bg-gradient-to-r from-[#062e69] to-[#062e69]/80 hover:from-[#062e69]/90 hover:to-[#062e69] text-white px-4 py-3 rounded-xl font-medium transition-all duration-200 transform hover:scale-101 hover:shadow-lg hover:shadow-[#062e69]/25 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                  className="w-full bg-gradient-to-r from-[#062e69] to-[#062e69]/80 hover:from-[#062e69]/90 hover:to-[#062e69] text-white px-4 py-3 rounded-xl font-medium transition-all duration-200 transform hover:scale-100 hover:shadow-lg hover:shadow-[#062e69]/25 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                 >
                   <Download className="w-4 h-4" />
                   <span>
