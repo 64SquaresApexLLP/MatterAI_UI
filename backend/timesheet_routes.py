@@ -12,11 +12,12 @@ from models import (
 from auth_routes import get_current_user
 from database_utils import (
     create_timesheet_entry, get_timesheet_entries,
-    update_timesheet_entry, delete_timesheet_entry, run_snowflake_query
+    update_timesheet_entry, delete_timesheet_entry
 )
 
 router = APIRouter(prefix="/timesheet", tags=["Timesheet"])
 chatbot_router = APIRouter(prefix="/chatbot", tags=["Chatbot"])
+MOCK_TIMESHEET_DB: Dict[str, Dict[str, Any]] = {}
 
 def generate_entry_id() -> str:
     return str(uuid.uuid4())
@@ -213,14 +214,24 @@ async def create_timesheet_entry_endpoint(request: Request, current_user: User =
         if not entry_data.get('entry_status'):
             entry_data['entry_status'] = 'draft'
 
-        # Save to database
-        user_id = getattr(current_user, 'id', 1)
-        db_result = create_timesheet_entry(user_id, entry_data)
-
-        if db_result["success"]:
-            return TimesheetResponse(success=True, message="Timesheet entry created successfully", entry_id=entry_id, entry=entry)
-        else:
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Database error: {db_result['message']}")
+        # Save to DB or fallback to mock
+        try:
+            user_id = getattr(current_user, 'id', 1)
+            db_result = create_timesheet_entry(user_id, entry_data)
+            if db_result["success"]:
+                return TimesheetResponse(success=True, message="Timesheet entry created successfully in database", entry_id=entry_id, entry=entry)
+            else:
+                raise Exception(f"Database error: {db_result['message']}")
+        except Exception as db_err:
+            entry_data_mock = entry.model_dump()
+            entry_data_mock.update({
+                "id": entry_id,
+                "created_by": current_user.username,
+                "created_at": datetime.utcnow(),
+                "updated_at": datetime.utcnow()
+            })
+            MOCK_TIMESHEET_DB[entry_id] = entry_data_mock
+            return TimesheetResponse(success=True, message="Timesheet entry created successfully (mock database)", entry_id=entry_id, entry=entry)
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to create timesheet entry: {str(e)}")
 
@@ -240,64 +251,78 @@ async def get_timesheet_entries_endpoint(
     Get timesheet entries with filtering and pagination
     """
     try:
-        user_id = getattr(current_user, 'id', 1)
-
-        filters = {
-            'client': client,
-            'matter': matter,
-            'timekeeper': timekeeper,
-            'date_from': date_from,
-            'date_to': date_to,
-            'entry_type': entry_type,
-            'limit': page_size,
-            'offset': (page - 1) * page_size
-        }
-
-        db_result = get_timesheet_entries(user_id, filters)
-
-        if not db_result["success"] or db_result["data"] is None:
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Database error: {db_result.get('message', 'Unknown error')}")
-
-        entries = []
-        for entry_data in db_result["data"]:
-            # Get ID or generate one if missing
-            entry_id = entry_data.get("ID") or entry_data.get("id") or str(entry_data.get("ENTRY_ID", ""))
-            if not entry_id:
-                entry_id = generate_entry_id()
-            # Convert to string if it's an integer
-            entry_id = str(entry_id)
-
-            mapped_data = {
-                "id": entry_id,
-                "client": entry_data.get("CLIENT") or entry_data.get("client"),
-                "matter": entry_data.get("MATTER") or entry_data.get("matter"),
-                "timekeeper": entry_data.get("TIMEKEEPER") or entry_data.get("timekeeper"),
-                "date": entry_data.get("ENTRY_DATE") or entry_data.get("entry_date"),
-                "type": entry_data.get("ENTRY_TYPE") or entry_data.get("entry_type"),
-                "hours_worked": entry_data.get("HOURS_WORKED") or entry_data.get("hours_worked"),
-                "hours_billed": entry_data.get("HOURS_BILLED") or entry_data.get("hours_billed"),
-                "quantity": entry_data.get("QUANTITY") or entry_data.get("quantity"),
-                "rate": entry_data.get("RATE") or entry_data.get("rate"),
-                "currency": entry_data.get("CURRENCY") or entry_data.get("currency"),
-                "total": entry_data.get("TOTAL") or entry_data.get("total"),
-                "phase_task": entry_data.get("PHASE_TASK") or entry_data.get("phase_task"),
-                "activity": entry_data.get("ACTIVITY") or entry_data.get("activity"),
-                "expense": entry_data.get("EXPENSE") or entry_data.get("expense"),
-                "bill_code": entry_data.get("BILL_CODE") or entry_data.get("bill_code"),
-                "status": entry_data.get("ENTRY_STATUS") or entry_data.get("entry_status"),
-                "narrative": entry_data.get("NARRATIVE") or entry_data.get("narrative")
+        # Try database first
+        try:
+            user_id = getattr(current_user, 'id', 1)
+            filters = {
+                'client': client,
+                'matter': matter,
+                'timekeeper': timekeeper,
+                'date_from': date_from,
+                'date_to': date_to,
+                'entry_type': entry_type,
+                'limit': page_size,
+                'offset': (page - 1) * page_size
             }
-            # Filter out None values except for id
-            mapped_data = {k: v for k, v in mapped_data.items() if k == "id" or v is not None}
-            try:
-                entry = TimesheetEntry(**mapped_data)
-                entries.append(entry)
-            except Exception as model_error:
-                continue
-
-        return TimesheetListResponse(success=True, entries=entries, total_count=len(entries), page=page, page_size=page_size)
-    except HTTPException:
-        raise
+            db_result = get_timesheet_entries(user_id, filters)
+            if db_result["success"] and db_result["data"] is not None:
+                entries = []
+                for entry_data in db_result["data"]:
+                    mapped_data = {
+                        "client": entry_data.get("CLIENT") or entry_data.get("client"),
+                        "matter": entry_data.get("MATTER") or entry_data.get("matter"),
+                        "timekeeper": entry_data.get("TIMEKEEPER") or entry_data.get("timekeeper"),
+                        "date": entry_data.get("ENTRY_DATE") or entry_data.get("entry_date"),
+                        "type": entry_data.get("ENTRY_TYPE") or entry_data.get("entry_type"),
+                        "hours_worked": entry_data.get("HOURS_WORKED") or entry_data.get("hours_worked"),
+                        "hours_billed": entry_data.get("HOURS_BILLED") or entry_data.get("hours_billed"),
+                        "quantity": entry_data.get("QUANTITY") or entry_data.get("quantity"),
+                        "rate": entry_data.get("RATE") or entry_data.get("rate"),
+                        "currency": entry_data.get("CURRENCY") or entry_data.get("currency"),
+                        "total": entry_data.get("TOTAL") or entry_data.get("total"),
+                        "phase_task": entry_data.get("PHASE_TASK") or entry_data.get("phase_task"),
+                        "activity": entry_data.get("ACTIVITY") or entry_data.get("activity"),
+                        "expense": entry_data.get("EXPENSE") or entry_data.get("expense"),
+                        "bill_code": entry_data.get("BILL_CODE") or entry_data.get("bill_code"),
+                        "status": entry_data.get("ENTRY_STATUS") or entry_data.get("entry_status"),
+                        "narrative": entry_data.get("NARRATIVE") or entry_data.get("narrative")
+                    }
+                    mapped_data = {k: v for k, v in mapped_data.items() if v is not None}
+                    try:
+                        entry = TimesheetEntry(**mapped_data)
+                        entries.append(entry)
+                    except Exception as model_error:
+                        continue
+                return TimesheetListResponse(success=True, entries=entries, total_count=len(entries), page=page, page_size=page_size)
+            else:
+                raise Exception("Database query failed")
+        except Exception as db_error:
+            # Fallback to mock database
+            filtered_entries = []
+            for entry_data in MOCK_TIMESHEET_DB.values():
+                # Apply filters
+                if client and client.lower() not in entry_data["client"].lower():
+                    continue
+                if matter and matter.lower() not in entry_data["matter"].lower():
+                    continue
+                if timekeeper and timekeeper.lower() not in entry_data["timekeeper"].lower():
+                    continue
+                if date_from and entry_data["date"] < date_from:
+                    continue
+                if date_to and entry_data["date"] > date_to:
+                    continue
+                if entry_type and entry_data.get("entry_type", entry_data.get("type")) != entry_type:
+                    continue
+                try:
+                    entry = TimesheetEntry(**{k: v for k, v in entry_data.items() if k in TimesheetEntry.model_fields})
+                    filtered_entries.append(entry)
+                except Exception:
+                    continue
+            total_count = len(filtered_entries)
+            start_idx = (page - 1) * page_size
+            end_idx = start_idx + page_size
+            paginated_entries = filtered_entries[start_idx:end_idx]
+            return TimesheetListResponse(success=True, entries=paginated_entries, total_count=total_count, page=page, page_size=page_size)
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to retrieve timesheet entries: {str(e)}")
 
@@ -348,18 +373,10 @@ async def delete_timesheet_entry_endpoint(
     current_user: User = Depends(get_current_user)
 ):
     try:
-        # Convert entry_id to int for database query
-        try:
-            entry_id_int = int(entry_id)
-        except ValueError:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid entry ID format")
-
-        db_result = delete_timesheet_entry(entry_id_int)
-
-        if db_result["success"]:
+        if entry_id in MOCK_TIMESHEET_DB:
+            del MOCK_TIMESHEET_DB[entry_id]
             return SuccessResponse(success=True, message="Timesheet entry deleted successfully")
-        else:
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Database error: {db_result['message']}")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Timesheet entry not found")
     except HTTPException:
         raise
     except Exception as e:
@@ -402,8 +419,8 @@ async def timesheet_health_check():
 
 @router.get("/debug/database")
 async def debug_database_connection():
-    from database_setup import get_snowflake_connection, DB_CONFIG
-    conn = get_snowflake_connection()
+    from database_setup import get_connection, DB_CONFIG
+    conn = get_connection()
     if conn:
         try:
             cursor = conn.cursor()

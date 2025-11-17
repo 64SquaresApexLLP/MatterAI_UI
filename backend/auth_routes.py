@@ -3,10 +3,11 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import jwt, JWTError
 from datetime import datetime, timedelta
 from typing import Optional
+import bcrypt
 import os
-
+from pydantic import BaseModel
 from models import LoginRequest, LoginResponse, User, SuccessResponse
-from database_utils import run_snowflake_query   # ✅ always use this
+from database_utils import run_postgres_query
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -15,175 +16,171 @@ security = HTTPBearer()
 
 # JWT Configuration
 SECRET_KEY = os.getenv("JWT_SECRET_KEY", "your-secret-key-change-in-production")
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 1440
+ALGORITHM = os.getenv("ALGORITHM", "HS256")
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 1440))
 
+class TokenData(BaseModel):
+    username: str
+    user_id: int
+    role: str
+    org_id: int
 
-# ----------------------------
-# Database Init
-# ----------------------------
-def init_users_table():
-    """Create USERS table if not exists and insert default admin"""
-    # The table should already exist from database_setup.py, but let's ensure it has the right structure
-    try:
-        # Just insert the admin user if it doesn't exist
-        insert_query = """
-        INSERT INTO MATTERAI_DB.PUBLIC.USERS (USERNAME, EMAIL, PASSWORD, NAME)
-        SELECT 'admin', 'admin@gmail.com', '1234', 'Admin User'
-        WHERE NOT EXISTS (
-            SELECT 1 FROM MATTERAI_DB.PUBLIC.USERS WHERE USERNAME = 'admin'
-        )
-        """
-        result = run_snowflake_query(insert_query)
+class UserResponse(BaseModel):
+    id: int
+    username: str
+    email: str
+    name: str = ""
+    is_active: bool = True
 
-        # Also add a test user
-        insert_test_query = """
-        INSERT INTO MATTERAI_DB.PUBLIC.USERS (USERNAME, EMAIL, PASSWORD, NAME)
-        SELECT 'test', 'test@test.com', 'test', 'Test User'
-        WHERE NOT EXISTS (
-            SELECT 1 FROM MATTERAI_DB.PUBLIC.USERS WHERE USERNAME = 'test'
-        )
-        """
-        run_snowflake_query(insert_test_query)
+    role_id: int | None = None
+    role_name: str | None = None
 
-        return result["success"] if result else False
-    except Exception as e:
-        print(f"Error in init_users_table: {e}")
-        return False
+    org_id: int | None = None
+    org_name: str | None = None
 
-
-# ----------------------------
-# JWT Helpers
-# ----------------------------
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
     expire = datetime.utcnow() + (expires_delta or timedelta(minutes=15))
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
+# def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
+#     if not credentials:
+#         raise HTTPException(status_code=401, detail="No authorization header provided")
+#     try:
+#         payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
+#         username: str = payload.get("sub")
+#         if username is None:
+#             raise HTTPException(status_code=401, detail="Invalid authentication credentials")
+#         return username
+#     except JWTError:
+#         raise HTTPException(status_code=401, detail="Invalid authentication credentials")
 
 def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
     if not credentials:
-        raise HTTPException(status_code=401, detail="No authorization header provided")
+        raise HTTPException(status_code=401, detail="Authorization header missing")
+
+    token = credentials.credentials
+
     try:
-        payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
-        if username is None:
-            raise HTTPException(status_code=401, detail="Invalid authentication credentials")
-        return username
-    except JWTError:
-        raise HTTPException(status_code=401, detail="Invalid authentication credentials")
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
 
-
-def get_current_user(username: str = Depends(verify_token)):
-    query = """
-        SELECT ID, USERNAME, EMAIL, NAME, IS_ACTIVE
-        FROM MATTERAI_DB.PUBLIC.USERS
-        WHERE USERNAME = %s OR EMAIL = %s
-    """
-    result = run_snowflake_query(query, (username, username))
-    if result and result.get("success") and result.get("data"):
-        user_data = result["data"][0]
-        return User(
-            id=user_data.get("ID") or user_data.get("id"),
-            username=user_data.get("USERNAME") or user_data.get("username"),
-            email=user_data.get("EMAIL") or user_data.get("email"),
-            name=user_data.get("NAME") or user_data.get("name", ""),
-            is_active=user_data.get("IS_ACTIVE", True) or user_data.get("is_active", True)
+        data = TokenData(
+            username = payload.get("username"),
+            user_id  = payload.get("user_id"),
+            role     = payload.get("role"),
+            org_id   = payload.get("org_id")
         )
+        print(data)
+        return data
+
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    
+# def get_current_user(username: str = Depends(verify_token)):
+#     query = """
+#         SELECT ID, USERNAME, EMAIL, NAME, IS_ACTIVE
+#         FROM USERS
+#         WHERE USERNAME = %s OR EMAIL = %s
+#     """
+#     # result = run_snowflake_query(query, (username, username))
+#     result = run_postgres_query(query, (username, username))
+#     if result and result.get("success") and result.get("data"):
+#         user_data = result["data"][0]
+#         return User(
+#             id=user_data.get("ID") or user_data.get("id"),
+#             username=user_data.get("USERNAME") or user_data.get("username"),
+#             email=user_data.get("EMAIL") or user_data.get("email"),
+#             name=user_data.get("NAME") or user_data.get("name", ""),
+#             is_active=user_data.get("IS_ACTIVE", True) or user_data.get("is_active", True)
+#         )
+#     raise HTTPException(status_code=401, detail="User not found or inactive")
+
+def get_current_user(token_data: TokenData = Depends(verify_token)):
+    query = """
+        SELECT 
+            u.id AS user_id,
+            u.username,
+            u.email,
+            u.name,
+            u.is_active,
+
+            r.id AS role_id,
+            r.role_name,
+
+            o.id AS org_id,
+            o.org_name
+
+        FROM users u
+        LEFT JOIN roles r ON u.role_id = r.id
+        LEFT JOIN organizations o ON u.org_id = o.id
+        WHERE u.username = %s OR u.email = %s
+    """
+
+    result = run_postgres_query(query, (token_data.username, token_data.username))
+
+    if result and result.get("success") and result.get("data"):
+        row = result["data"][0]
+
+        return UserResponse(
+            id=row["user_id"],
+            username=row["username"],
+            email=row["email"],
+            name=row.get("name", ""),
+            is_active=row.get("is_active", True),
+
+            role_id=row.get("role_id"),
+            role_name=row.get("role_name"),
+
+            org_id=row.get("org_id"),
+            org_name=row.get("org_name"),
+        )
+
     raise HTTPException(status_code=401, detail="User not found or inactive")
-
-
-# ----------------------------
-# Routes
-# ----------------------------
-@router.get("/debug/users")
-async def debug_users():
-    """Debug endpoint to see all users in database"""
-    query = "SELECT ID, USERNAME, EMAIL, PASSWORD, NAME, IS_ACTIVE FROM MATTERAI_DB.PUBLIC.USERS"
-    result = run_snowflake_query(query)
-
-    if result and result.get("success"):
-        return {
-            "users": result["data"],
-            "count": len(result["data"]) if result["data"] else 0
-        }
-    else:
-        error_msg = result.get("message", "Database query failed") if result else "Database connection failed"
-        return {"error": error_msg}
-
-@router.get("/debug/create-admin")
-async def create_admin_user():
-    """Debug endpoint to manually create admin user"""
-    try:
-        # First ensure the table exists
-        init_users_table()
-
-        # Check if admin already exists
-        check_query = "SELECT COUNT(*) as count FROM MATTERAI_DB.PUBLIC.USERS WHERE USERNAME = 'admin'"
-        check_result = run_snowflake_query(check_query)
-
-        if check_result and check_result.get("success") and check_result.get("data"):
-            count = check_result["data"][0].get("COUNT") or check_result["data"][0].get("count")
-            if count > 0:
-                return {"message": "Admin user already exists"}
-
-        # Create admin user
-        insert_query = """
-        INSERT INTO MATTERAI_DB.PUBLIC.USERS (USERNAME, EMAIL, PASSWORD, NAME)
-        VALUES ('admin', 'admin@gmail.com', '1234', 'Admin User')
-        """
-        result = run_snowflake_query(insert_query)
-
-        if result and result.get("success"):
-            return {"message": "Admin user created successfully"}
-        else:
-            error_msg = result.get('message', 'Unknown error') if result else "Database connection failed"
-            return {"error": f"Failed to create admin user: {error_msg}"}
-
-    except Exception as e:
-        return {"error": f"Exception: {str(e)}"}
 
 @router.post("/login", response_model=LoginResponse)
 async def login(login_request: LoginRequest):
-    # Get the identifier (username or email)
     identifier = login_request.username or login_request.email
+    print(login_request)
 
-    # Snowflake query
     query = """
-       SELECT ID, USERNAME, EMAIL, PASSWORD, NAME, IS_ACTIVE, CREATED_AT, UPDATED_AT
-       FROM MATTERAI_DB.PUBLIC.USERS
-       WHERE (USERNAME = %s OR EMAIL = %s)
-       AND PASSWORD = %s
+        SELECT 
+            u.id,
+            u.username,
+            u.email,
+            u.password,
+            u.name,
+            u.is_active,
+            u.org_id,
+            r.name AS role_name,
+            o.name AS org_name
+        FROM users u
+        LEFT JOIN roles r ON u.role_id = r.id
+        LEFT JOIN organizations o ON u.org_id = o.id
+        WHERE (u.username = %s OR u.email = %s)
+        LIMIT 1;
     """
-    result = run_snowflake_query(
-        query,
-        (identifier, identifier, login_request.password)
-    )
 
-    # Handle case where run_snowflake_query returns None
+    result = run_postgres_query(query, (identifier, identifier))
+
     if not result or not result.get("success") or not result.get("data"):
-        # Debug: Let's also check if user exists without password check
-        debug_query = """
-           SELECT ID, USERNAME, EMAIL, PASSWORD
-           FROM MATTERAI_DB.PUBLIC.USERS
-           WHERE (USERNAME = %s OR EMAIL = %s)
-        """
-        debug_result = run_snowflake_query(debug_query, (identifier, identifier))
+        raise HTTPException(status_code=401, detail="User not found")
 
-        if debug_result and debug_result.get("success") and debug_result.get("data"):
-            # User exists but password is wrong
-            raise HTTPException(status_code=401, detail="Invalid password")
-        else:
-            # User doesn't exist or database connection failed
-            print(f"🔍 Debug result: {debug_result}")
-            raise HTTPException(status_code=401, detail="User not found")
+    user = result["data"][0]
 
-    user_data = result["data"][0]
+    stored_hash = user["password"]
+
+    if not bcrypt.checkpw(login_request.password.encode("utf-8"), stored_hash.encode("utf-8")):
+        raise HTTPException(status_code=401, detail="Invalid password")
 
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user_data.get("USERNAME") or user_data.get("username")},
+        data={
+            "username": user["username"],
+            "user_id": user["id"],
+            "role": user["role_name"],
+            "org_id": user["org_id"],
+        },
         expires_delta=access_token_expires
     )
 
@@ -192,13 +189,17 @@ async def login(login_request: LoginRequest):
         message="Login successful",
         token=access_token,
         user={
-            "id": user_data.get("ID") or user_data.get("id"),
-            "username": user_data.get("USERNAME") or user_data.get("username"),
-            "email": user_data.get("EMAIL") or user_data.get("email"),
-            "name": user_data.get("NAME") or user_data.get("name", ""),
-            "is_active": user_data.get("IS_ACTIVE", True)
+            "id": user["id"],
+            "username": user["username"],
+            "email": user["email"],
+            "name": user["name"],
+            "is_active": user["is_active"],
+            "org_id": user["org_id"],
+            "org_name": user["org_name"],
+            "role": user["role_name"]
         }
     )
+
 
 
 @router.post("/logout", response_model=SuccessResponse)

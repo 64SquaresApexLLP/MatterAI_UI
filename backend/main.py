@@ -5,13 +5,16 @@ import os
 
 # Import route modules
 from auth_routes import router as auth_router, init_users_table
+from org_routes import router as org_routes
 from query_routes import router as query_router
 from timesheet_routes import router as timesheet_router, chatbot_router
 from file_routes import router as file_router
-from database_setup import initialize_database
 from file_converter_routes import router as file_converter_router
+from database_setup import initialize_database
 
-# Create FastAPI app with metadata
+# ============================================================
+#   FastAPI App Configuration
+# ============================================================
 app = FastAPI(
     title="MatterAI Backend API",
     description="Backend API for MatterAI legal assistant platform",
@@ -20,35 +23,53 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
-# Configure CORS for frontend integration
+# ============================================================
+#   CORS Configuration (Merged from both versions)
+# ============================================================
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:3000",
+        "http://localhost:5173/timesheet/entries",
+
+        # Production frontend & backend servers
         "http://13.203.251.172:5173",
         "http://13.203.251.172:5174",
-        "http://localhost:5173",
-        "http://localhost:3000",
-        "http://localhost:5173/timesheet/entries"
+
+        # Backend ports
+        "http://localhost:8000",
+        "http://localhost:8002",
+        "http://13.203.251.172:8002"
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Mount static files for file downloads
+# ============================================================
+#   Static Files (Uploads)
+# ============================================================
 if not os.path.exists("uploads"):
     os.makedirs("uploads")
+
 app.mount("/static", StaticFiles(directory="uploads"), name="static")
 
-# Include routers
+# ============================================================
+#   Routers (All Combined)
+# ============================================================
 app.include_router(auth_router)
+app.include_router(org_routes)
 app.include_router(query_router)
 app.include_router(timesheet_router)
 app.include_router(chatbot_router)
 app.include_router(file_router)
 app.include_router(file_converter_router)
 
-# Root endpoint
+# ============================================================
+#   Root Endpoint
+# ============================================================
 @app.get("/")
 async def root():
     return {
@@ -62,26 +83,32 @@ async def root():
             "query": "/query",
             "timesheet": "/timesheet",
             "chatbot": "/chatbot",
-            "files": "/files"
+            "files": "/files",
+            "file_converter": "/file-converter"
         }
     }
 
-# Database initialization on startup
+# ============================================================
+#   Startup Event → DB Initialization
+# ============================================================
 @app.on_event("startup")
 async def startup_event():
-    """Initialize database tables on application startup"""
     print("🚀 Starting MatterAI Backend...")
+
     try:
         if initialize_database():
             print("✅ Database initialized")
-            init_users_table()
+            init_users_table()  # from auth_routes
         else:
-            print("📝 Continuing with mock data...")
-    except Exception as e:
-        print(f"⚠️ Database error: {str(e)[:50]}...")
-        print("📝 Continuing with mock data...")
+            print("❌ Database initialization failed — using fallback data")
 
-# Health check endpoint
+    except Exception as e:
+        print(f"⚠️ Database error: {str(e)[:80]}...")
+        print("📝 Continuing with fallback data...")
+
+# ============================================================
+#   Health Check
+# ============================================================
 @app.get("/health")
 async def health_check():
     return {
@@ -92,10 +119,14 @@ async def health_check():
             "timesheet": "healthy",
             "chatbot": "healthy",
             "files": "healthy",
+            "file_converter": "healthy",
             "database": "healthy"
         }
     }
 
+# ============================================================
+#   Local Development Server
+# ============================================================
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run(app, host="0.0.0.0", port=8002, reload=True)
