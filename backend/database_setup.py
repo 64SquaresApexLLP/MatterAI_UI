@@ -4,6 +4,7 @@ import os
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from dotenv import load_dotenv
+import bcrypt
 
 load_dotenv()
 
@@ -55,6 +56,7 @@ def create_tables_if_not_exist():
             email VARCHAR(255) UNIQUE NOT NULL,
             password VARCHAR(255) NOT NULL,
             name VARCHAR(255),
+            role VARCHAR(50) DEFAULT 'user',
             is_active BOOLEAN DEFAULT TRUE,
             created_at TIMESTAMP DEFAULT NOW(),
             updated_at TIMESTAMP DEFAULT NOW()
@@ -103,9 +105,16 @@ def create_tables_if_not_exist():
         conn.close()
 
 
+def hash_password(password: str) -> str:
+    """Hash a password using bcrypt"""
+    salt = bcrypt.gensalt()
+    hashed = bcrypt.hashpw(password.encode('utf-8'), salt)
+    return hashed.decode('utf-8')
+
+
 def insert_default_users():
     """
-    Insert admin/test user once
+    Insert admin/test user once with hashed passwords
     """
     conn = get_connection()
     if not conn:
@@ -114,21 +123,27 @@ def insert_default_users():
     try:
         cursor = conn.cursor()
 
+        # Hash passwords for default users
+        admin_password_hash = hash_password('1234')
+        test_password_hash = hash_password('test')
+
+        # Insert admin user
         cursor.execute("""
             INSERT INTO public.users (username, email, password, name)
-            SELECT 'admin', 'admin@gmail.com', '1234', 'Admin User'
+            SELECT 'admin', 'admin@gmail.com', %s, 'Admin User'
             WHERE NOT EXISTS (
                 SELECT 1 FROM public.users WHERE username='admin'
             );
-        """)
+        """, (admin_password_hash,))
 
+        # Insert test user
         cursor.execute("""
             INSERT INTO public.users (username, email, password, name)
-            SELECT 'test', 'test@test.com', 'test', 'Test User'
+            SELECT 'test', 'test@test.com', %s, 'Test User'
             WHERE NOT EXISTS (
                 SELECT 1 FROM public.users WHERE username='test'
             );
-        """)
+        """, (test_password_hash,))
 
         conn.commit()
         return True

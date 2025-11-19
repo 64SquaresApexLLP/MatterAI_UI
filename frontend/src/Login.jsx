@@ -1,13 +1,89 @@
-import React, { useState } from "react";
-import { Eye, EyeOff, User, Lock, LogIn, Shield, X } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import {
+  Eye,
+  EyeOff,
+  User,
+  Lock,
+  LogIn,
+  Shield,
+  X,
+  Building2,
+} from "lucide-react";
 import { authAPI } from "./api/apiService";
 
 const Login = ({ onLoginSuccess }) => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [organization, setOrganization] = useState("");
+  const [role, setRole] = useState("");
+  const [organizations, setOrganizations] = useState([]);
+  const [roles, setRoles] = useState([]);
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+
+  // Fetch organizations and roles on component mount
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // Fetch organizations
+        const orgResponse = await authAPI.getOrganizations();
+        console.log("Organizations response:", orgResponse);
+        if (orgResponse.success && orgResponse.organizations) {
+          setOrganizations(orgResponse.organizations);
+          // Set default organization if only one exists
+          if (orgResponse.organizations.length === 1) {
+            setOrganization(orgResponse.organizations[0].name);
+          }
+        }
+
+        // Fetch roles
+        console.log("About to fetch roles...");
+        const roleResponse = await authAPI.getRoles();
+        console.log("Roles response:", roleResponse);
+        console.log("Roles response type:", typeof roleResponse);
+        console.log("Roles array:", roleResponse?.roles);
+        console.log("Roles array length:", roleResponse?.roles?.length);
+        console.log(
+          "Roles array is array?:",
+          Array.isArray(roleResponse?.roles)
+        );
+
+        if (roleResponse && roleResponse.success && roleResponse.roles) {
+          console.log("Setting roles to state:", roleResponse.roles);
+          const rolesArray = roleResponse.roles;
+          console.log("Roles array before setState:", rolesArray);
+
+          // Normalize roles to consistent shape: { id, role_name }
+          const normalized = rolesArray.map((r, idx) => ({
+            id: r.id ?? r.role_id ?? r.roleId ?? idx,
+            role_name: r.role_name ?? r.name ?? r.role ?? r.roleName ?? String(r.id ?? idx),
+            description: r.description ?? r.desc ?? "",
+          }));
+
+          console.log("Normalized roles:", normalized);
+          setRoles(normalized);
+          console.log("setRoles called");
+
+          // Verify state update in next tick
+          setTimeout(() => {
+            console.log("Checking roles state after setTimeout...");
+          }, 100);
+          // Auto-select if only one role is available
+          if (Array.isArray(normalized) && normalized.length === 1) {
+            const single = normalized[0];
+            if (single.role_name) setRole(single.role_name);
+          }
+        } else {
+          console.error("Failed to set roles. Response:", roleResponse);
+        }
+      } catch (error) {
+        console.error("Failed to fetch organizations/roles:", error);
+        console.error("Error stack:", error.stack);
+      }
+    };
+    fetchData();
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -15,9 +91,18 @@ const Login = ({ onLoginSuccess }) => {
     setError("");
 
     try {
-      const response = await authAPI.login(username, password);
+      const response = await authAPI.login(
+        username,
+        password,
+        organization,
+        role
+      );
       if (response.success === true) {
-        onLoginSuccess({ username, token: response.token });
+        onLoginSuccess({
+          username,
+          token: response.token,
+          user: response.user,
+        });
       } else {
         setError("Invalid username or password.");
       }
@@ -30,9 +115,19 @@ const Login = ({ onLoginSuccess }) => {
       if (errorMessage.includes("Invalid password")) {
         setError("Incorrect password. Please try again.");
       } else if (errorMessage.includes("User not found")) {
-        setError("User not found. Please check your email/username.");
+        setError(
+          "User not found. Please check your email/username, organization, and role."
+        );
+      } else if (errorMessage.includes("does not have")) {
+        setError(
+          "You don't have access with the selected role. Please check your role selection."
+        );
       } else if (errorMessage.includes("401")) {
         setError("Invalid username or password.");
+      } else if (errorMessage.includes("403")) {
+        setError(
+          "Access denied. Your account may be inactive or you don't have the selected role."
+        );
       } else {
         setError("Login failed. Please try again.");
       }
@@ -186,6 +281,107 @@ const Login = ({ onLoginSuccess }) => {
                       <Eye className="h-4 w-4" />
                     )}
                   </button>
+                </div>
+              </div>
+
+              {organizations.length > 1 && (
+                <div className="space-y-2">
+                  <label className="text-[#062e69] text-xs font-bold block tracking-wider uppercase flex items-center space-x-1">
+                    <Building2 className="w-3 h-3" />
+                    <span>Organization</span>
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Building2
+                        className={`h-4 w-4 transition-colors duration-300 ${
+                          organization ? "text-[#062e69]" : "text-[#062e69]/60"
+                        }`}
+                      />
+                    </div>
+                    <select
+                      value={organization}
+                      onChange={(e) => setOrganization(e.target.value)}
+                      className="w-full pl-10 pr-4 py-3 bg-white border border-[#062e69]/20 rounded-lg text-[#062e69] focus:outline-none focus:border-[#062e69] focus:ring-2 focus:ring-[#062e69]/20 transition-all duration-300 text-sm font-medium appearance-none cursor-pointer"
+                    >
+                      <option value="">Select Organization</option>
+                      {organizations.map((org) => (
+                        <option key={org.id} value={org.name}>
+                          {org.name}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                      <svg
+                        className="w-4 h-4 text-[#062e69]/60"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M19 9l-7 7-7-7"
+                        />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <label className="text-[#062e69] text-xs font-bold block tracking-wider uppercase flex items-center space-x-1">
+                  <Shield className="w-3 h-3" />
+                  <span>
+                    Login As{" "}
+                    {roles.length > 0 && `(${roles.length} roles loaded)`}
+                  </span>
+                </label>
+                {/* Roles debug removed - cleaned UI */}
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Shield
+                      className={`h-4 w-4 transition-colors duration-300 ${
+                        role ? "text-[#062e69]" : "text-[#062e69]/60"
+                      }`}
+                    />
+                  </div>
+                  <select
+                    value={role}
+                    onChange={(e) => setRole(e.target.value)}
+                    className="w-full pl-10 pr-4 py-3 bg-white border border-[#062e69]/20 rounded-lg text-[#062e69] focus:outline-none focus:border-[#062e69] focus:ring-2 focus:ring-[#062e69]/20 transition-all duration-300 text-sm font-medium appearance-none cursor-pointer"
+                  >
+                    <option value="">Select Role (Optional)</option>
+                    {roles && roles.length > 0 ? (
+                      roles.map((r) => {
+                        // support multiple possible backend key names
+                        const roleId = r.id ?? r.role_id ?? r.roleId ?? JSON.stringify(r);
+                        const roleName = r.role_name ?? r.name ?? r.role ?? r.roleName ?? String(roleId);
+                        return (
+                          <option key={roleId} value={roleName}>
+                            {roleName}
+                          </option>
+                        );
+                      })
+                    ) : (
+                      <option disabled>Loading roles...</option>
+                    )}
+                  </select>
+                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                    <svg
+                      className="w-4 h-4 text-[#062e69]/60"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 9l-7 7-7-7"
+                      />
+                    </svg>
+                  </div>
                 </div>
               </div>
 

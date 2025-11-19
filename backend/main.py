@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 import os
 
 # Import route modules
-from auth_routes import router as auth_router, init_users_table
+from auth_routes import router as auth_router
 from org_routes import router as org_routes
 from query_routes import router as query_router
 from timesheet_routes import router as timesheet_router, chatbot_router

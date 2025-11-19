@@ -424,31 +424,28 @@ async def debug_database_connection():
     if conn:
         try:
             cursor = conn.cursor()
-            cursor.execute("SELECT CURRENT_VERSION()")
+            cursor.execute("SELECT version()")
             version = cursor.fetchone()
-            cursor.execute("SELECT CURRENT_WAREHOUSE()")
-            current_warehouse = cursor.fetchone()
-            cursor.execute("SELECT CURRENT_DATABASE(), CURRENT_SCHEMA()")
-            current_db_schema = cursor.fetchone()
-            cursor.execute("SHOW WAREHOUSES")
-            warehouses = cursor.fetchall()
-            warehouse_names = [w[0] for w in warehouses] if warehouses else []
+            cursor.execute("SELECT current_database()")
+            current_database = cursor.fetchone()
+            cursor.execute("SELECT current_schema()")
+            current_schema = cursor.fetchone()
+            cursor.execute("SELECT current_user")
+            current_user = cursor.fetchone()
             cursor.close()
             conn.close()
             return {
                 "database_connection": "success",
-                "snowflake_version": version[0] if version else "unknown",
-                "current_warehouse": current_warehouse[0] if current_warehouse and current_warehouse[0] else "None",
-                "current_database": current_db_schema[0] if current_db_schema and current_db_schema[0] else "None",
-                "current_schema": current_db_schema[1] if current_db_schema and len(current_db_schema) > 1 else "None",
-                "available_warehouses": warehouse_names,
+                "postgres_version": version[0] if version else "unknown",
+                "current_database": current_database[0] if current_database else "None",
+                "current_schema": current_schema[0] if current_schema else "None",
+                "current_user": current_user[0] if current_user else "None",
                 "config": {
+                    "host": DB_CONFIG.get('host', 'not_set'),
+                    "port": DB_CONFIG.get('port', 'not_set'),
+                    "database": DB_CONFIG.get('dbname', 'not_set'),
                     "user": DB_CONFIG.get('user', 'not_set'),
-                    "account": DB_CONFIG.get('account', 'not_set'),
-                    "warehouse": DB_CONFIG.get('warehouse', 'not_set'),
-                    "database": DB_CONFIG.get('database', 'not_set'),
-                    "schema": DB_CONFIG.get('schema', 'not_set'),
-                    "password": "***" if DB_CONFIG.get('password') != 'your_password' else 'not_set'
+                    "password": "***" if DB_CONFIG.get('password') else 'not_set'
                 }
             }
         except Exception as e:
@@ -456,12 +453,11 @@ async def debug_database_connection():
                 "database_connection": "failed",
                 "error": str(e),
                 "config": {
+                    "host": DB_CONFIG.get('host', 'not_set'),
+                    "port": DB_CONFIG.get('port', 'not_set'),
+                    "database": DB_CONFIG.get('dbname', 'not_set'),
                     "user": DB_CONFIG.get('user', 'not_set'),
-                    "account": DB_CONFIG.get('account', 'not_set'),
-                    "warehouse": DB_CONFIG.get('warehouse', 'not_set'),
-                    "database": DB_CONFIG.get('database', 'not_set'),
-                    "schema": DB_CONFIG.get('schema', 'not_set'),
-                    "password": "***" if DB_CONFIG.get('password') != 'your_password' else 'not_set'
+                    "password": "***" if DB_CONFIG.get('password') else 'not_set'
                 }
             }
     else:
@@ -469,12 +465,11 @@ async def debug_database_connection():
             "database_connection": "failed",
             "error": "Could not establish connection",
             "config": {
+                "host": DB_CONFIG.get('host', 'not_set'),
+                "port": DB_CONFIG.get('port', 'not_set'),
+                "database": DB_CONFIG.get('dbname', 'not_set'),
                 "user": DB_CONFIG.get('user', 'not_set'),
-                "account": DB_CONFIG.get('account', 'not_set'),
-                "warehouse": DB_CONFIG.get('warehouse', 'not_set'),
-                "database": DB_CONFIG.get('database', 'not_set'),
-                "schema": DB_CONFIG.get('schema', 'not_set'),
-                "password": "***" if DB_CONFIG.get('password') != 'your_password' else 'not_set'
+                "password": "***" if DB_CONFIG.get('password') else 'not_set'
             }
         }
 

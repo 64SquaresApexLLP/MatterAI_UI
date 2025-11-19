@@ -58,7 +58,7 @@ const apiCall = async (endpoint, options = {}) => {
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       console.error("API call failed:", response.status, errorData);
-      
+
       const errorMessage =
         errorData.detail ||
         errorData.message ||
@@ -76,16 +76,32 @@ const apiCall = async (endpoint, options = {}) => {
 
 // Authentication API
 export const authAPI = {
-  login: async (username, password) => {
+  login: async (username, password, organization = null, role = null) => {
+    const loginData = { username, password };
+    if (organization) {
+      loginData.organization = organization;
+    }
+    if (role) {
+      loginData.role = role;
+    }
+
     const response = await apiCall(API_ENDPOINTS.LOGIN, {
       method: HTTP_METHODS.POST,
-      body: JSON.stringify({ username, password }),
+      body: JSON.stringify(loginData),
     });
 
     if (response.success && response.token) {
       setAuthToken(response.token);
     }
     return response;
+  },
+
+  getOrganizations: async () => {
+    return await apiCall(API_ENDPOINTS.ORGANIZATIONS);
+  },
+
+  getRoles: async () => {
+    return await apiCall(API_ENDPOINTS.ROLES);
   },
 
   logout: async () => {

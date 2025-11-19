@@ -35,6 +35,8 @@ class LoginRequest(BaseModel):
     username: Optional[str] = None
     email: Optional[str] = None
     password: str = Field(..., min_length=1, description="User password")
+    organization: Optional[str] = Field(None, description="Organization name")
+    role: Optional[str] = Field(None, description="Role name (SuperAdmin, OrgAdmin, User)")
 
     @model_validator(mode='after')
     def validate_username_or_email(self):
@@ -53,7 +55,33 @@ class User(BaseModel):
     username: str
     email: EmailStr
     name: str
+    org_id: Optional[int] = None
+    role_id: Optional[int] = None
     is_active: Optional[bool] = True
+
+class Organization(BaseModel):
+    id: Optional[int] = None
+    name: str
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+class Role(BaseModel):
+    id: Optional[int] = None
+    role_name: str
+    description: Optional[str] = None
+    created_at: Optional[datetime] = None
+
+class UserWithDetails(BaseModel):
+    """User with organization and role details"""
+    id: int
+    username: str
+    email: str
+    name: str
+    org_id: Optional[int] = None
+    org_name: Optional[str] = None
+    role_id: Optional[int] = None
+    role_name: Optional[str] = None
+    is_active: bool = True
 
 # File Upload Models
 class UploadedFile(BaseModel):
