@@ -545,7 +545,7 @@ export const formatFileSize = (bytes) => {
 export const useHomeLogic = () => {
   const [percentage, setPercentage] = useState(0);
   const [query, setQuery] = useState("");
-  const [selectedButton, setSelectedButton] = useState(null);
+  const [selectedButton, setSelectedButton] = useState("Translation");
   const [selectedLanguage, setSelectedLanguage] = useState("");
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState([]);
