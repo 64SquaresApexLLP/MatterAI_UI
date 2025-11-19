@@ -434,10 +434,17 @@ const getAccuracyColor = (accuracy) => {
         <div className="text-[#062e69] text-center">
           <Upload className="w-16 h-16 mx-auto mb-4" />
           <p className="text-2xl font-semibold">Drop files here to upload</p>
-          <p className="text-sm mt-2 opacity-70">Release to upload your files</p>
+          <p className="text-sm mt-2 opacity-70">
+            {selectedButton === "Translation" 
+              ? "Supported formats: PDF, DOCX, PPTX"
+              : selectedButton === "File_Converter"
+              ? "Supported formats: PDF, DOC, DOCX"
+              : "Release to upload your files"
+            }
+          </p>
         </div>
       </div>
-    </div>
+      </div>s
   </div>
       <ToastContainer
         position="top-right"
@@ -570,9 +577,9 @@ const getAccuracyColor = (accuracy) => {
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder={
                     selectedButton === "Translation"
-                      ? "Translate to Spanish, French, and German | Drag your file here for translation"
+                      ? "Translate to Spanish, French, and German | Drag & Drop your file for translation"
                       : selectedButton === "File_Converter"
-                      ? "Convert file to Word/PDF..."
+                      ? "Convert file to Word/PDF... | Drag & Drop your file for conversion"
                       : "Case related questions..."
                   }
                   className="flex-1 bg-transparent text-[#062e69] placeholder-[#062e69]/50 focus:outline-none text-lg font-medium"
@@ -627,7 +634,6 @@ const getAccuracyColor = (accuracy) => {
                     </div>
                   </div>
                 )}
-
         {selectedButton === "File_Converter" && (
           <div className="relative flex mr-1">
             <div className="relative">
