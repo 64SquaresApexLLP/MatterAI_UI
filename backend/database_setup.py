@@ -132,7 +132,7 @@ def insert_default_users():
             INSERT INTO public.users (username, email, password, name)
             SELECT 'admin', 'admin@gmail.com', %s, 'Admin User'
             WHERE NOT EXISTS (
-                SELECT 1 FROM public.users WHERE username='admin'
+                SELECT 1 FROM public.users WHERE x'admin'
             );
         """, (admin_password_hash,))
 

@@ -57,7 +57,12 @@ const Login = ({ onLoginSuccess }) => {
           // Normalize roles to consistent shape: { id, role_name }
           const normalized = rolesArray.map((r, idx) => ({
             id: r.id ?? r.role_id ?? r.roleId ?? idx,
-            role_name: r.role_name ?? r.name ?? r.role ?? r.roleName ?? String(r.id ?? idx),
+            role_name:
+              r.role_name ??
+              r.name ??
+              r.role ??
+              r.roleName ??
+              String(r.id ?? idx),
             description: r.description ?? r.desc ?? "",
           }));
 
@@ -355,8 +360,14 @@ const Login = ({ onLoginSuccess }) => {
                     {roles && roles.length > 0 ? (
                       roles.map((r) => {
                         // support multiple possible backend key names
-                        const roleId = r.id ?? r.role_id ?? r.roleId ?? JSON.stringify(r);
-                        const roleName = r.role_name ?? r.name ?? r.role ?? r.roleName ?? String(roleId);
+                        const roleId =
+                          r.id ?? r.role_id ?? r.roleId ?? JSON.stringify(r);
+                        const roleName =
+                          r.role_name ??
+                          r.name ??
+                          r.role ??
+                          r.roleName ??
+                          String(roleId);
                         return (
                           <option key={roleId} value={roleName}>
                             {roleName}
