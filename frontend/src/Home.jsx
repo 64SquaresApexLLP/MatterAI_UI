@@ -11,15 +11,7 @@ const Home = ({ user, onBack, onLogout }) => {
     setShowFileSelector(translationJobs.length > 0);
   }, [translationJobs]);
 
-  document.addEventListener("DOMContentLoaded", function () {
-  if (!localStorage.getItem("hasLoadedBefore")) {
-    handleButtonClick("Translation");
-    localStorage.setItem("hasLoadedBefore", "true");
-  }
-  });
-
   useEffect(() => {
-    // handleButtonClick("Translation")
     const loadPreviewFile = async () => {
       if (
         selectedJobForPreview &&
@@ -424,24 +416,36 @@ const getAccuracyColor = (accuracy) => {
   }, [translationJobs, jobStatuses, evaluationData]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-[#062e69] to-slate-800 flex relative overflow-hidden">
-      <div 
-      className="min-h-screen bg-gradient-to-br from-slate-900 via-[#062e69] to-slate-800 flex relative overflow-hidden"
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
-    >
-      {isDragOver && (
-        <div className="fixed inset-0 bg-[#062e69]/20 backdrop-blur-md z-50 flex items-center justify-center">
-          <div className="bg-white/80 w-[50%] h-[50%] align-center backdrop-blur-xl rounded-3xl p-12 border-4 border-dashed border-[#062e69]/70 shadow-2xl">
-            <div className="text-[#062e69] text-center">
-              <Upload className="w-16 h-16 mx-auto mb-4" />
-              <p className="text-2xl font-semibold">Drop files here to upload</p>
-            </div>
-          </div>
+  <div className="min-h-screen bg-gradient-to-br from-slate-900 via-[#062e69] to-slate-800 flex relative overflow-hidden"
+    onDragOver={handleDragOver}
+    onDragLeave={handleDragLeave}
+    onDrop={handleDrop}
+  >
+  <div 
+    className={`fixed inset-0 z-50 transition-all duration-300 ${
+      isDragOver 
+        ? 'opacity-100 pointer-events-auto' 
+        : 'opacity-0 pointer-events-none'
+    }`}
+    
+  >
+    <div className="w-full h-full bg-[#062e69]/20 backdrop-blur-md flex items-center justify-center">
+      <div className="bg-white/80 w-[50%] h-[50%] backdrop-blur-xl rounded-3xl p-12 border-4 border-dashed border-[#062e69]/70 shadow-2xl flex items-center justify-center">
+        <div className="text-[#062e69] text-center">
+          <Upload className="w-16 h-16 mx-auto mb-4" />
+          <p className="text-2xl font-semibold">Drop files here to upload</p>
+          <p className="text-sm mt-2 opacity-70">
+            {selectedButton === "Translation" 
+              ? "Supported formats: PDF, DOCX, PPTX"
+              : selectedButton === "File_Converter"
+              ? "Supported formats: PDF, DOC, DOCX"
+              : "Release to upload your files"
+            }
+          </p>
         </div>
-      )}
       </div>
+      </div>s
+  </div>
       <ToastContainer
         position="top-right"
         autoClose={3000}
@@ -549,25 +553,17 @@ const getAccuracyColor = (accuracy) => {
           </div>
           <div className="mb-4 animate-slide-up delay-200">
             <div className="relative group">
-              <div className="absolute inset-0 bg-gradient-to-r from-[#062e69]/25 to-white/20 rounded-2xl blur-xl group-hover:blur-2xl transition-all duration-300"></div>
+              <div className="absolute inset-0 bg-gradient-to-r from-[#062e69]/25 to-white/20 rounded-2xl blur-xl group-hover:blur-2xl"></div>
               <div
                 className={`relative bg-white/95 backdrop-blur-xl border rounded-2xl p-4 flex items-center space-x-4 transition-all duration-300 ${
                   isDragOver
                     ? "border-[#062e69]/70 bg-white shadow-xl"
                     : "border-[#062e69]/30 hover:border-[#062e69]/50 shadow-lg"
                 }`}
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
+                // onDragOver={handleDragOver}
+                // onDragLeave={handleDragLeave}
+                // onDrop={handleDrop}
               >
-              {/* {isDragOver && (
-                <div className="absolute top-0 left-0 w-full h-full bg-[#062e69]/10 backdrop-blur-sm rounded-2xl border-2 border-dashed border-[#062e69]/50 flex items-center justify-center z-10">
-                  <div className="text-[#062e69] font-medium flex items-center space-x-2">
-                    <Upload className="w-5 h-5" />
-                    <span>Drop files here to upload</span>
-                  </div>
-                </div>
-              )} */}
                 <div className="flex-shrink-0">
                   <div className="w-6 h-6 text-[#062e69]/70">
                     <svg viewBox="0 0 24 24" fill="currentColor">
@@ -581,9 +577,9 @@ const getAccuracyColor = (accuracy) => {
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder={
                     selectedButton === "Translation"
-                      ? "Translate to Spanish, French, and German | Drag your file here for translation"
+                      ? "Translate to Spanish, French, and German | Drag & Drop your file for translation"
                       : selectedButton === "File_Converter"
-                      ? "Convert file to Word/PDF..."
+                      ? "Convert file to Word/PDF... | Drag & Drop your file for conversion"
                       : "Case related questions..."
                   }
                   className="flex-1 bg-transparent text-[#062e69] placeholder-[#062e69]/50 focus:outline-none text-lg font-medium"
@@ -636,55 +632,8 @@ const getAccuracyColor = (accuracy) => {
                         </div>
                       )}
                     </div>
-                    {/* <div className="relative">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setShowJurisdictionDropdown((prev) => !prev)
-                        }
-                        className="p-2 text-[#062e69]/70 hover:text-[#062e69] transition-colors duration-200 hover:bg-[#062e69]/10 rounded-lg flex items-center space-x-1"
-                        title="Select Jurisdiction"
-                      >
-                        <Globe className="w-5 h-5" />
-                        {selectedJurisdiction ? (
-                          <span className="text-sm font-medium max-w-24 truncate">
-                            {selectedJurisdiction}
-                          </span>
-                        ) : (
-                          <span className="text-sm text-[#062e69]/50">
-                            Jurisdiction
-                          </span>
-                        )}
-                      </button>
-                      {showJurisdictionDropdown && (
-                        <div className="absolute bottom-full right-0 mb-2 w-48 bg-white/95 backdrop-blur-xl border border-[#062e69]/30 rounded-xl shadow-xl z-30 max-h-60 overflow-y-auto">
-                          <div className="p-2">
-                            <div className="text-[#062e69] font-medium text-sm mb-2 px-2">
-                              Select Jurisdiction
-                            </div>
-                            {jurisdictions.map((jurisdiction) => (
-                              <button
-                                key={jurisdiction}
-                                onClick={() => {
-                                  setSelectedJurisdiction(jurisdiction);
-                                  setShowJurisdictionDropdown(false);
-                                }}
-                                className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-all duration-200 ${
-                                  selectedJurisdiction === jurisdiction
-                                    ? "bg-[#062e69] text-white"
-                                    : "text-[#062e69] hover:bg-[#062e69]/10"
-                                }`}
-                              >
-                                {jurisdiction}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div> */}
                   </div>
                 )}
-
         {selectedButton === "File_Converter" && (
           <div className="relative flex mr-1">
             <div className="relative">
@@ -706,32 +655,32 @@ const getAccuracyColor = (accuracy) => {
                   )}
                 </button>
                 {showFileTypeDropdown && (
-  <div className="absolute bottom-full right-0 mb-2 w-48 bg-white/95 backdrop-blur-xl border border-[#062e69]/30 rounded-xl shadow-xl z-30 max-h-60 overflow-y-auto">
-    <div className="p-2">
-      <div className="text-[#062e69] font-medium text-sm mb-2 px-2">
-        Select Target Format
-      </div>
-      {['pdf', 'docx'].map((format) => (
-  <button
-    key={format}
-    onClick={() => {
-      console.log('Setting target file type to:', format);
-      setSelectedTargetFileType(format);
-      setShowFileTypeDropdown(false);
-      console.log('After setting - selectedTargetFileType:', format);
-    }}
-    className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-all duration-200 ${
-      selectedTargetFileType === format
-        ? "bg-[#062e69] text-white"
-        : "text-[#062e69] hover:bg-[#062e69]/10"
-    }`}
-  >
-    {format.toUpperCase()}
-  </button>
-))}
-    </div>
-  </div>
-)}
+                  <div className="absolute bottom-full right-0 mb-2 w-48 bg-white/95 backdrop-blur-xl border border-[#062e69]/30 rounded-xl shadow-xl z-30 max-h-60 overflow-y-auto">
+                    <div className="p-2">
+                      <div className="text-[#062e69] font-medium text-sm mb-2 px-2">
+                        Select Target Format
+                      </div>
+                      {['pdf', 'docx'].map((format) => (
+                      <button
+                        key={format}
+                        onClick={() => {
+                          console.log('Setting target file type to:', format);
+                          setSelectedTargetFileType(format);
+                          setShowFileTypeDropdown(false);
+                          console.log('After setting - selectedTargetFileType:', format);
+                        }}
+                        className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-all duration-200 ${
+                          selectedTargetFileType === format
+                            ? "bg-[#062e69] text-white"
+                            : "text-[#062e69] hover:bg-[#062e69]/10"
+                        }`}
+                      >
+                        {format.toUpperCase()}
+                      </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
                   </div>
                 </div>
                 )}
@@ -758,7 +707,6 @@ const getAccuracyColor = (accuracy) => {
                   <Paperclip className="w-5 h-5" />
                 </button>
                 <button
-                  // onClick={selectedButton === "File_Converter" ? handleFileConversion : handleSubmit}
                   onClick={selectedButton === "File_Converter" ? () => handleFileConversion(selectedTargetFileType) : handleSubmit}
                   disabled={
                     isTranslating || 
@@ -806,43 +754,6 @@ const getAccuracyColor = (accuracy) => {
               </div>
             </div>
           )}
-          {/* {selectedButton === "Translation" && (
-            <div className="mb-2 text-xs text-white/70 text-center bg-white/10 backdrop-blur-sm rounded-lg p-3 border border-white/20">
-              <div
-                className="flex items-center justify-between mb-1 cursor-pointer"
-                onClick={() => setShowPromptSection((prev) => !prev)}
-              >
-                <div className="flex items-center gap-2">
-                  <Info className="w-4 h-4 text-white-600" />
-                  <span className="font-semibold text-white">
-                    Example Prompt for{" "}
-                    {selectedJurisdiction || "Patent Translation"}
-                  </span>
-                </div>
-                <span className="text-white select-none">
-                  {showPromptSection ? "−" : "+"}
-                </span>
-              </div>
-              {showPromptSection && (
-                <div className="text-white-800 text-sm flex justify-between items-center">
-                  <div className="whitespace-pre-wrap text-left max-w-[85%]">
-                    {examplePrompt}
-                  </div>
-                  <button
-                    className="text-white hover:text-blue-400 p-1"
-                    onClick={() => {
-                      navigator.clipboard
-                        .writeText(examplePrompt)
-                        .then(() => alert("Text copied to clipboard!"))
-                        .catch((err) => alert("Failed to copy text: " + err));
-                    }}
-                  >
-                    <Copy className="w-5 h-5" />
-                  </button>
-                </div>
-              )}
-            </div>
-          )} */}
           {selectedButton === "Translation" && (
             <div className="mt-2 mb-4 text-xs text-white/70 text-center bg-white/10 backdrop-blur-sm rounded-lg p-3 border border-white/20">
               <div
@@ -1180,36 +1091,6 @@ const getAccuracyColor = (accuracy) => {
               <Languages className="w-4 h-4 inline-block mr-2" />
               Translation
             </button>
-            {/* <button
-              onClick={() => handleButtonClick("Timesheet")}
-              className={`group backdrop-blur-xl border font-medium transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-[#062e69]/25 px-6 py-3 rounded-xl ${
-                selectedButton === "Timesheet"
-                  ? "bg-blue-900 text-white border-[#062e69] shadow-lg"
-                  : "bg-white/90 border-[#062e69]/30 hover:border-[#062e69]/50 text-[#062e69]"
-              }`}
-            >
-              Timesheet
-            </button>
-            <button
-              onClick={() => handleButtonClick("Matters")}
-              className={`group backdrop-blur-xl border font-medium transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-[#062e69]/25 px-6 py-3 rounded-xl ${
-                selectedButton === "Matters"
-                  ? "bg-blue-900 text-white border-[#062e69] shadow-lg"
-                  : "bg-white/90 border-[#062e69]/30 hover:border-[#062e69]/50 text-[#062e69]"
-              }`}
-            >
-              Matters
-            </button>
-            <button
-              onClick={() => handleButtonClick("Entries")}
-              className={`group backdrop-blur-xl border font-medium transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-[#062e69]/25 px-6 py-3 rounded-xl ${
-                selectedButton === "Entries"
-                  ? "bg-blue-900 text-white border-[#062e69] shadow-lg"
-                  : "bg-white/90 border-[#062e69]/30 hover:border-[#062e69]/50 text-[#062e69]"
-              }`}
-            >
-              Entries
-            </button> */}
             <button
               onClick={() => handleButtonClick("File_Converter")}
               className={`group backdrop-blur-xl border font-medium transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-[#062e69]/25 px-6 py-3 rounded-xl ${
@@ -1594,39 +1475,43 @@ const getAccuracyColor = (accuracy) => {
       )}
     </div>
               </div>
-              {previewingFile && previewingFile.type === "docx" ? (
-                <div className="flex space-x-2">
-                  <button
-                    onClick={() => handleDownload(selectedJobForPreview)}
-                    disabled={
-                      !selectedJobForPreview ||
-                      !jobStatuses[selectedJobForPreview]?.download_id
-                    }
-                    className="flex-1 bg-gradient-to-r from-[#062e69] to-[#062e69]/80 hover:from-[#062e69]/90 hover:to-[#062e69] text-white px-4 py-3 rounded-xl font-medium transition-all duration-200 transform hover:scale-101 hover:shadow-lg hover:shadow-[#062e69]/25 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-                  >
-                    <Download className="w-4 h-4" />
-                    <span>Download Word</span>
-                  </button>
-                  <button
-                    onClick={() => handleDownloadPdf(selectedJobForPreview)}
-                    disabled={
-                      !selectedJobForPreview ||
-                      !jobStatuses[selectedJobForPreview]?.download_id ||
-                      convertingToPdf
-                    }
-                    className="flex-1 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white px-4 py-3 rounded-xl font-medium transition-all duration-200 transform hover:scale-101 hover:shadow-lg hover:shadow-green-500/25 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-                  >
-                    {convertingToPdf ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <FileText className="w-4 h-4" />
-                    )}
-                    <span>
-                      {convertingToPdf ? "Converting..." : "Download PDF"}
-                    </span>
-                  </button>
-                </div>
+              {false
+              // previewingFile && previewingFile.type === "docx" 
+              ? (
+                <div></div>
+                // <div className="flex space-x-2">
+                //   <button
+                //     onClick={() => handleDownload(selectedJobForPreview)}
+                //     disabled={
+                //       !selectedJobForPreview ||
+                //       !jobStatuses[selectedJobForPreview]?.download_id
+                //     }
+                //     className="flex-1 bg-gradient-to-r from-[#062e69] to-[#062e69]/80 hover:from-[#062e69]/90 hover:to-[#062e69] text-white px-4 py-3 rounded-xl font-medium transition-all duration-200 transform hover:scale-101 hover:shadow-lg hover:shadow-[#062e69]/25 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                //   >
+                //     <Download className="w-4 h-4" />
+                //     <span>Download Word</span>
+                //   </button>
+                //   <button
+                //     onClick={() => handleDownloadPdf(selectedJobForPreview)}
+                //     disabled={
+                //       !selectedJobForPreview ||
+                //       !jobStatuses[selectedJobForPreview]?.download_id ||
+                //       convertingToPdf
+                //     }
+                //     className="flex-1 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white px-4 py-3 rounded-xl font-medium transition-all duration-200 transform hover:scale-101 hover:shadow-lg hover:shadow-green-500/25 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                //   >
+                //     {convertingToPdf ? (
+                //       <Loader2 className="w-4 h-4 animate-spin" />
+                //     ) : (
+                //       <FileText className="w-4 h-4" />
+                //     )}
+                //     <span>
+                //       {convertingToPdf ? "Converting..." : "Download PDF"}
+                //     </span>
+                //   </button>
+                // </div>
               ) : (
+                <center>
                 <button
                   onClick={() =>
                     selectedJobForPreview &&
@@ -1646,9 +1531,10 @@ const getAccuracyColor = (accuracy) => {
                             (j) => j.job_id === selectedJobForPreview
                           )?.filename || "File"
                         }`
-                      : "Select file to download"}
+                        : "Select file to download"}
                   </span>
                 </button>
+                </center>
               )}
             </div>
           </div>
