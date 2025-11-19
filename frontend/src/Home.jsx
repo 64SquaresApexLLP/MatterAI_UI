@@ -11,7 +11,15 @@ const Home = ({ user, onBack, onLogout }) => {
     setShowFileSelector(translationJobs.length > 0);
   }, [translationJobs]);
 
+  document.addEventListener("DOMContentLoaded", function () {
+  if (!localStorage.getItem("hasLoadedBefore")) {
+    handleButtonClick("Translation");
+    localStorage.setItem("hasLoadedBefore", "true");
+  }
+  });
+
   useEffect(() => {
+    // handleButtonClick("Translation")
     const loadPreviewFile = async () => {
       if (
         selectedJobForPreview &&
@@ -417,6 +425,23 @@ const getAccuracyColor = (accuracy) => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-[#062e69] to-slate-800 flex relative overflow-hidden">
+      <div 
+      className="min-h-screen bg-gradient-to-br from-slate-900 via-[#062e69] to-slate-800 flex relative overflow-hidden"
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {isDragOver && (
+        <div className="fixed inset-0 bg-[#062e69]/20 backdrop-blur-md z-50 flex items-center justify-center">
+          <div className="bg-white/80 w-[50%] h-[50%] align-center backdrop-blur-xl rounded-3xl p-12 border-4 border-dashed border-[#062e69]/70 shadow-2xl">
+            <div className="text-[#062e69] text-center">
+              <Upload className="w-16 h-16 mx-auto mb-4" />
+              <p className="text-2xl font-semibold">Drop files here to upload</p>
+            </div>
+          </div>
+        </div>
+      )}
+      </div>
       <ToastContainer
         position="top-right"
         autoClose={3000}
@@ -485,6 +510,7 @@ const getAccuracyColor = (accuracy) => {
           ← Back to Chatbot Selection
         </button>
       </div>
+  
       <div className="absolute top-4 right-4 z-20">
         <div className="flex items-center space-x-4 bg-white/90 backdrop-blur-xl border border-[#062e69]/30 rounded-xl px-4 py-2 shadow-lg">
           <div className="flex items-center space-x-2 text-[#062e69]">
@@ -534,6 +560,14 @@ const getAccuracyColor = (accuracy) => {
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
               >
+              {/* {isDragOver && (
+                <div className="absolute top-0 left-0 w-full h-full bg-[#062e69]/10 backdrop-blur-sm rounded-2xl border-2 border-dashed border-[#062e69]/50 flex items-center justify-center z-10">
+                  <div className="text-[#062e69] font-medium flex items-center space-x-2">
+                    <Upload className="w-5 h-5" />
+                    <span>Drop files here to upload</span>
+                  </div>
+                </div>
+              )} */}
                 <div className="flex-shrink-0">
                   <div className="w-6 h-6 text-[#062e69]/70">
                     <svg viewBox="0 0 24 24" fill="currentColor">
@@ -547,7 +581,7 @@ const getAccuracyColor = (accuracy) => {
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder={
                     selectedButton === "Translation"
-                      ? "Enter translation instructions (e.g., 'Translate to Spanish, French, and German') or select language..."
+                      ? "Translate to Spanish, French, and German | Drag your file here for translation"
                       : selectedButton === "File_Converter"
                       ? "Convert file to Word/PDF..."
                       : "Case related questions..."
@@ -602,7 +636,7 @@ const getAccuracyColor = (accuracy) => {
                         </div>
                       )}
                     </div>
-                    <div className="relative">
+                    {/* <div className="relative">
                       <button
                         type="button"
                         onClick={() =>
@@ -647,7 +681,7 @@ const getAccuracyColor = (accuracy) => {
                           </div>
                         </div>
                       )}
-                    </div>
+                    </div> */}
                   </div>
                 )}
 
@@ -754,14 +788,6 @@ const getAccuracyColor = (accuracy) => {
               )}
             </button>
               </div>
-              {isDragOver && (
-                <div className="absolute inset-0 bg-[#062e69]/10 backdrop-blur-sm rounded-2xl border-2 border-dashed border-[#062e69]/50 flex items-center justify-center z-10">
-                  <div className="text-[#062e69] font-medium flex items-center space-x-2">
-                    <Upload className="w-5 h-5" />
-                    <span>Drop files here to upload</span>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
           {selectedButton === "Translation" && isMultiLanguageMode && (
@@ -780,7 +806,7 @@ const getAccuracyColor = (accuracy) => {
               </div>
             </div>
           )}
-          {selectedButton === "Translation" && (
+          {/* {selectedButton === "Translation" && (
             <div className="mb-2 text-xs text-white/70 text-center bg-white/10 backdrop-blur-sm rounded-lg p-3 border border-white/20">
               <div
                 className="flex items-center justify-between mb-1 cursor-pointer"
@@ -816,7 +842,7 @@ const getAccuracyColor = (accuracy) => {
                 </div>
               )}
             </div>
-          )}
+          )} */}
           {selectedButton === "Translation" && (
             <div className="mt-2 mb-4 text-xs text-white/70 text-center bg-white/10 backdrop-blur-sm rounded-lg p-3 border border-white/20">
               <div
@@ -1154,7 +1180,7 @@ const getAccuracyColor = (accuracy) => {
               <Languages className="w-4 h-4 inline-block mr-2" />
               Translation
             </button>
-            <button
+            {/* <button
               onClick={() => handleButtonClick("Timesheet")}
               className={`group backdrop-blur-xl border font-medium transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-[#062e69]/25 px-6 py-3 rounded-xl ${
                 selectedButton === "Timesheet"
@@ -1183,7 +1209,7 @@ const getAccuracyColor = (accuracy) => {
               }`}
             >
               Entries
-            </button>
+            </button> */}
             <button
               onClick={() => handleButtonClick("File_Converter")}
               className={`group backdrop-blur-xl border font-medium transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-[#062e69]/25 px-6 py-3 rounded-xl ${

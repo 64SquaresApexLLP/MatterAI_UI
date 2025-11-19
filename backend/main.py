@@ -98,7 +98,7 @@ async def startup_event():
     try:
         if initialize_database():
             print("✅ Database initialized")
-            init_users_table()  # from auth_routes
+            # init_users_table()  # from auth_routes
         else:
             print("❌ Database initialization failed — using fallback data")
 
