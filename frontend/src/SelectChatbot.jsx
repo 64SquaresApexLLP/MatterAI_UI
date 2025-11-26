@@ -1,19 +1,25 @@
 import React, { useState } from "react";
 import {  LogOut,
   User,
+  Settings,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import Home from "./Home";
 import OntologicsChat from "./OntologicsChat";
+import AdminPanel from "./AdminPanel";
 
 const SelectChatbot = ({ user, onLogout }) => {
     const navigate = useNavigate();
     const [selectedBot, setSelectedBot] = useState(null);
+    const [showAdminPanel, setShowAdminPanel] = useState(false);
 
     const handleBotSelect = (botType) => {
         setSelectedBot(botType);
     };
+
+    const isSuperAdmin = user?.user?.role_name === "SuperAdmin" || user?.role_name === "SuperAdmin";
+    const isOrgAdmin = user?.user?.role_name === "OrgAdmin" || user?.role_name === "OrgAdmin";
 
     if (selectedBot === 'ontologics') {
         return <OntologicsChat user={user} onBack={() => setSelectedBot(null)} onLogout={onLogout} />
@@ -36,6 +42,16 @@ const SelectChatbot = ({ user, onLogout }) => {
               {/* {user?.name || "User"} */}
             </span>
           </div>
+          {(isSuperAdmin || isOrgAdmin) && (
+            <button
+              onClick={() => setShowAdminPanel(true)}
+              className="flex items-center space-x-1 text-[#062e69]/70 hover:text-[#062e69] transition-colors duration-200 text-sm font-medium"
+              title="Admin Panel"
+            >
+              <Settings className="w-4 h-4" />
+              <span>Admin</span>
+            </button>
+          )}
           <button
             onClick={onLogout}
             className="flex items-center space-x-1 text-[#062e69]/70 hover:text-[#062e69] transition-colors duration-200 text-sm font-medium"
@@ -46,6 +62,13 @@ const SelectChatbot = ({ user, onLogout }) => {
           </button>
         </div>
       </div>
+
+      {showAdminPanel && (
+        <AdminPanel
+          currentUser={user?.user || user}
+          onClose={() => setShowAdminPanel(false)}
+        />
+      )}
 
                 <div className="text-center mb-12">
                     <h1 className="text-4xl font-bold text-white mb-4">

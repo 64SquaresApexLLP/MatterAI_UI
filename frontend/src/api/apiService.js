@@ -272,6 +272,36 @@ export const fileAPI = {
   },
 };
 
+// Admin Management API
+export const adminAPI = {
+  // User Management
+  createUser: async (userData) => {
+    return await apiCall("/users", {
+      method: HTTP_METHODS.POST,
+      body: JSON.stringify(userData),
+    });
+  },
+
+  getUser: async (userId) => {
+    return await apiCall(`/users/${userId}`);
+  },
+
+  // Organization Management
+  createOrganization: async (orgData) => {
+    return await apiCall("/org/org-create", {
+      method: HTTP_METHODS.POST,
+      body: JSON.stringify(orgData),
+    });
+  },
+
+  createUserByOrgAdmin: async (userData) => {
+    return await apiCall("/org/user-create", {
+      method: HTTP_METHODS.POST,
+      body: JSON.stringify(userData),
+    });
+  },
+};
+
 // Health check
 export const healthAPI = {
   check: async () => {

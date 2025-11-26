@@ -6,6 +6,7 @@ import os
 # Import route modules
 from auth_routes import router as auth_router
 from org_routes import router as org_routes
+from user_routes import router as user_router
 from query_routes import router as query_router
 from timesheet_routes import router as timesheet_router, chatbot_router
 from file_routes import router as file_router
@@ -61,6 +62,7 @@ app.mount("/static", StaticFiles(directory="uploads"), name="static")
 # ============================================================
 app.include_router(auth_router)
 app.include_router(org_routes)
+app.include_router(user_router)
 app.include_router(query_router)
 app.include_router(timesheet_router)
 app.include_router(chatbot_router)

@@ -22,11 +22,11 @@ async def create_organization(
     current_user: UserResponse = Depends(get_current_user)
 ):
 
-    if current_user.role_name != "superadmin":
-        raise HTTPException(status_code=403, detail="Only superadmin can create organizations")
+    if current_user.role_name != "SuperAdmin":
+        raise HTTPException(status_code=403, detail="Only SuperAdmin can create organizations")
 
     check_org = run_postgres_query(
-        "SELECT id FROM organizations WHERE org_name = %s",
+        "SELECT id FROM organizations WHERE name = %s",
         (data.org_name,)
     )
 
@@ -34,23 +34,29 @@ async def create_organization(
         raise HTTPException(status_code=400, detail="Organization already exists")
 
     org_insert_query = """
-        INSERT INTO organizations (org_name, description, parent_org_id)
-        VALUES (%s, %s, %s)
-        RETURNING id, org_name;
+        INSERT INTO organizations (name, created_at, updated_at)
+        VALUES (%s, NOW(), NOW())
     """
 
     org_result = run_postgres_query(
         org_insert_query,
-        (data.org_name, data.description, current_user.org_id)
+        (data.org_name,)
     )
 
     if not org_result.get("success"):
         raise HTTPException(status_code=500, detail="Failed to create organization")
 
-    org = org_result["data"][0]
+    # Fetch the created organization by name
+    fetch_org_query = "SELECT id, name FROM organizations WHERE name = %s"
+    fetch_org_result = run_postgres_query(fetch_org_query, (data.org_name,))
+    
+    if not fetch_org_result.get("data"):
+        raise HTTPException(status_code=500, detail="Failed to retrieve created organization")
+    
+    org = fetch_org_result["data"][0]
     new_org_id = org["id"]
 
-    role_query = "SELECT id FROM roles WHERE role_name = 'orgadmin' LIMIT 1"
+    role_query = "SELECT id FROM roles WHERE role_name = 'OrgAdmin' LIMIT 1"
     role_result = run_postgres_query(role_query)
 
     if not role_result.get("data"):
@@ -73,7 +79,6 @@ async def create_organization(
     user_insert_query = """
         INSERT INTO users (org_id, username, email, password, name, role_id, is_active)
         VALUES (%s, %s, %s, %s, %s, %s, TRUE)
-        RETURNING id, username, email, name;
     """
 
     admin_result = run_postgres_query(
@@ -91,12 +96,19 @@ async def create_organization(
     if not admin_result.get("success"):
         raise HTTPException(status_code=500, detail="Organization created, but failed to create admin user")
 
-    admin = admin_result["data"][0]
+    # Fetch the created user
+    fetch_user_query = "SELECT id, username, email, name FROM users WHERE email = %s"
+    fetch_user_result = run_postgres_query(fetch_user_query, (data.admin_email,))
+    
+    if not fetch_user_result.get("data"):
+        raise HTTPException(status_code=500, detail="User created but could not retrieve details")
+    
+    admin = fetch_user_result["data"][0]
 
     return SuccessResponse(
         success=True,
         message=(
-            f"Organization '{org['org_name']}' created successfully. "
+            f"Organization '{org['name']}' created successfully. "
             f"Org Admin '{admin['username']}' added."
         )
     )
@@ -114,7 +126,7 @@ async def create_user_by_org_admin(
     current_user: UserResponse = Depends(get_current_user)
 ):
 
-    if current_user.role_name != "orgadmin":
+    if current_user.role_name != "OrgAdmin":
         raise HTTPException(status_code=403, detail="Only OrgAdmin can create users")
     
     org_id = current_user.org_id
