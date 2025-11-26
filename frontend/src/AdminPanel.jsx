@@ -54,7 +54,12 @@ const AdminPanel = ({ currentUser, onClose }) => {
 
   const handleCreateUser = async (e) => {
     e.preventDefault();
-    if (!formData.username || !formData.email || !formData.password || !formData.name) {
+    if (
+      !formData.username ||
+      !formData.email ||
+      !formData.password ||
+      !formData.name
+    ) {
       showMessage("All fields are required", "error");
       return;
     }
@@ -75,8 +80,18 @@ const AdminPanel = ({ currentUser, onClose }) => {
 
       const response = await adminAPI.createUser(payload);
       if (response.success) {
-        showMessage(`User '${formData.username}' created successfully`, "success");
-        setFormData({ username: "", email: "", password: "", name: "", role_id: "", org_id: "" });
+        showMessage(
+          `User '${formData.username}' created successfully`,
+          "success"
+        );
+        setFormData({
+          username: "",
+          email: "",
+          password: "",
+          name: "",
+          role_id: "",
+          org_id: "",
+        });
         setActiveTab(null);
       } else {
         showMessage(response.message || "Failed to create user", "error");
@@ -119,7 +134,10 @@ const AdminPanel = ({ currentUser, onClose }) => {
         });
         setActiveTab(null);
       } else {
-        showMessage(response.message || "Failed to create organization", "error");
+        showMessage(
+          response.message || "Failed to create organization",
+          "error"
+        );
       }
     } catch (error) {
       showMessage(error.message || "Error creating organization", "error");
@@ -165,7 +183,9 @@ const AdminPanel = ({ currentUser, onClose }) => {
                 <AlertCircle className="w-5 h-5 text-red-600" />
               )}
               <span
-                className={messageType === "success" ? "text-green-700" : "text-red-700"}
+                className={
+                  messageType === "success" ? "text-green-700" : "text-red-700"
+                }
               >
                 {message}
               </span>
@@ -197,7 +217,10 @@ const AdminPanel = ({ currentUser, onClose }) => {
                 </button>
 
                 {activeTab === "createOrg" && (
-                  <form onSubmit={handleCreateOrganization} className="bg-gray-50 p-6 rounded-lg space-y-4">
+                  <form
+                    onSubmit={handleCreateOrganization}
+                    className="bg-gray-50 p-6 rounded-lg space-y-4"
+                  >
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-semibold text-[#062e69] mb-2">
@@ -328,7 +351,10 @@ const AdminPanel = ({ currentUser, onClose }) => {
             )}
 
             {activeTab === "createUser" && (
-              <form onSubmit={handleCreateUser} className="bg-gray-50 p-6 rounded-lg space-y-4">
+              <form
+                onSubmit={handleCreateUser}
+                className="bg-gray-50 p-6 rounded-lg space-y-4"
+              >
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-semibold text-[#062e69] mb-2">
