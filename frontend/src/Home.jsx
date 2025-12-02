@@ -1391,7 +1391,7 @@ const getAccuracyColor = (accuracy) => {
               </p>
             </div>
           )}
-          <div className="bg-white rounded-xl shadow-2xl p-2 max-w-xs border border-gray-200">
+          {/* <div className="bg-white rounded-xl shadow-2xl p-2 max-w-xs border border-gray-200">
             <div
               className="flex justify-between items-center cursor-pointer"
               onClick={() => setIsExpanded(!isExpanded)}
@@ -1425,7 +1425,7 @@ const getAccuracyColor = (accuracy) => {
                 ))}
               </div>
             )}
-          </div>
+          </div> */}
         </div>
         <center>
           <button
