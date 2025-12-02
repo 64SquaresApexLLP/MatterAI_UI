@@ -263,54 +263,54 @@ const Home = ({ user, onBack, onLogout }) => {
     return new Blob(byteArrays, { type: mimeType });
   };
 
-  const handleDownloadPdf = async (jobId) => {
-    try {
-      const jobStatus = jobStatuses[jobId];
-      const selectedJob = translationJobs.find((job) => job.job_id === jobId);
+  // const handleDownloadPdf = async (jobId) => {
+  //   try {
+  //     const jobStatus = jobStatuses[jobId];
+  //     const selectedJob = translationJobs.find((job) => job.job_id === jobId);
 
-      if (!jobStatus?.download_id || !selectedJob) {
-        console.error("Job not found or not completed");
-        return;
-      }
+  //     if (!jobStatus?.download_id || !selectedJob) {
+  //       console.error("Job not found or not completed");
+  //       return;
+  //     }
 
-      const response = await fetch(
-        `${import.meta.env.VITE_TRANSLATION_API_URL}/download/${
-          jobStatus.download_id
-        }`,
-        { method: "GET" }
-      );
+  //     const response = await fetch(
+  //       `${import.meta.env.VITE_TRANSLATION_API_URL}/download/${
+  //         jobStatus.download_id
+  //       }`,
+  //       { method: "GET" }
+  //     );
 
-      if (!response.ok) {
-        throw new Error("Failed to download file");
-      }
+  //     if (!response.ok) {
+  //       throw new Error("Failed to download file");
+  //     }
 
-      const blob = await response.blob();
-      const contentType = response.headers.get("content-type") || "";
+  //     const blob = await response.blob();
+  //     const contentType = response.headers.get("content-type") || "";
 
-      if (
-        contentType.includes(
-          "vnd.openxmlformats-officedocument.wordprocessingml.document"
-        ) ||
-        selectedJob.filename.toLowerCase().endsWith(".docx")
-      ) {
-        const { blob: pdfBlob, filename: pdfFilename } =
-          await convertDocxToTextBasedPdf(blob, selectedJob.filename);
-        const url = URL.createObjectURL(pdfBlob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = pdfFilename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        3;
-      } else {
-        alert("PDF download is only available for Word documents");
-      }
-    } catch (error) {
-      alert(error);
-    }
-  };
+  //     if (
+  //       contentType.includes(
+  //         "vnd.openxmlformats-officedocument.wordprocessingml.document"
+  //       ) ||
+  //       selectedJob.filename.toLowerCase().endsWith(".docx")
+  //     ) {
+  //       const { blob: pdfBlob, filename: pdfFilename } =
+  //         await convertDocxToTextBasedPdf(blob, selectedJob.filename);
+  //       const url = URL.createObjectURL(pdfBlob);
+  //       const a = document.createElement("a");
+  //       a.href = url;
+  //       a.download = pdfFilename;
+  //       document.body.appendChild(a);
+  //       a.click();
+  //       document.body.removeChild(a);
+  //       URL.revokeObjectURL(url);
+  //       3;
+  //     } else {
+  //       alert("PDF download is only available for Word documents");
+  //     }
+  //   } catch (error) {
+  //     alert(error);
+  //   }
+  // };
 
   const convertDocxToTextBasedPdf = async (docxBlob, filename) => {
     setConvertingToPdf(true);
@@ -427,7 +427,6 @@ const getAccuracyColor = (accuracy) => {
         ? 'opacity-100 pointer-events-auto' 
         : 'opacity-0 pointer-events-none'
     }`}
-    
   >
     <div className="w-full h-full bg-[#062e69]/20 backdrop-blur-md flex items-center justify-center">
       <div className="bg-white/80 w-[50%] h-[50%] backdrop-blur-xl rounded-3xl p-12 border-4 border-dashed border-[#062e69]/70 shadow-2xl flex items-center justify-center">
@@ -577,7 +576,7 @@ const getAccuracyColor = (accuracy) => {
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder={
                     selectedButton === "Translation"
-                      ? "Translate to Spanish, French, and German | Drag & Drop your file for translation"
+                      ? "Translate to Chinese, German, French, English | Drag & Drop your file for translation"
                       : selectedButton === "File_Converter"
                       ? "Convert file to Word/PDF... | Drag & Drop your file for conversion"
                       : "Case related questions..."
