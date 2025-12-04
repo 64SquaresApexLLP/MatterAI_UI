@@ -265,55 +265,6 @@ const Home = ({ user, onBack, onLogout }) => {
     return new Blob(byteArrays, { type: mimeType });
   };
 
-  // const handleDownloadPdf = async (jobId) => {
-  //   try {
-  //     const jobStatus = jobStatuses[jobId];
-  //     const selectedJob = translationJobs.find((job) => job.job_id === jobId);
-
-  //     if (!jobStatus?.download_id || !selectedJob) {
-  //       console.error("Job not found or not completed");
-  //       return;
-  //     }
-
-  //     const response = await fetch(
-  //       `${import.meta.env.VITE_TRANSLATION_API_URL}/download/${
-  //         jobStatus.download_id
-  //       }`,
-  //       { method: "GET" }
-  //     );
-
-  //     if (!response.ok) {
-  //       throw new Error("Failed to download file");
-  //     }
-
-  //     const blob = await response.blob();
-  //     const contentType = response.headers.get("content-type") || "";
-
-  //     if (
-  //       contentType.includes(
-  //         "vnd.openxmlformats-officedocument.wordprocessingml.document"
-  //       ) ||
-  //       selectedJob.filename.toLowerCase().endsWith(".docx")
-  //     ) {
-  //       const { blob: pdfBlob, filename: pdfFilename } =
-  //         await convertDocxToTextBasedPdf(blob, selectedJob.filename);
-  //       const url = URL.createObjectURL(pdfBlob);
-  //       const a = document.createElement("a");
-  //       a.href = url;
-  //       a.download = pdfFilename;
-  //       document.body.appendChild(a);
-  //       a.click();
-  //       document.body.removeChild(a);
-  //       URL.revokeObjectURL(url);
-  //       3;
-  //     } else {
-  //       alert("PDF download is only available for Word documents");
-  //     }
-  //   } catch (error) {
-  //     alert(error);
-  //   }
-  // };
-
   const convertDocxToTextBasedPdf = async (docxBlob, filename) => {
     setConvertingToPdf(true);
     try {
@@ -533,9 +484,12 @@ const getAccuracyColor = (accuracy) => {
         </div>
       </div>
       <div
-        className={`flex-1 p-6 transition-all duration-300 max-h-screen overflow-y-auto ${
-          showPreview ? "pr-2" : ""
-        }`}
+      className={`
+        // ${showPreview || showDeltaModal ? "w-[30vw]" : "w-full"}
+        ${showPreview && !showDeltaModal ? "w-[50vw]" : showPreview && showDeltaModal ? "w-[30vw]" : "w-full"}
+        transition-all duration-300
+        max-h-screen overflow-y-auto p-6
+      `}
       >
         <div
           className={`relative z-10 w-full mx-auto transition-all duration-300 ${
@@ -1211,7 +1165,7 @@ const getAccuracyColor = (accuracy) => {
         </div>
       </div>
       {showPreview && ( 
-  <div className="w-1/2 p-2 bg-white/5 backdrop-blur-sm border-l border-white/10 animate-slide-in-right overflow-y-auto max-h-screen">
+    <div className={`fixed top-0 h-full ${showDeltaModal ? "right-[35vw] w-[35vw] bg-white/5 backdrop-blur-sm border-l border-white/10" : "right-0 w-[50vw]"} p-2 overflow-y-auto z-40`}>
     <div className="h-full bg-white/95 backdrop-blur-xl border border-[#062e69]/30 rounded-2xl shadow-lg flex flex-col overflow-y-auto max-h-screen">
       {/* Header Section */}
       <div className="flex items-center justify-between p-2">
@@ -1277,8 +1231,8 @@ const getAccuracyColor = (accuracy) => {
             onClick={() => handleViewDelta(selectedJobForPreview)}
             className="w-full bg-gradient-to-r from-blue-700 to-blue-800 hover:from-blue-800 hover:to-blue-900 text-white px-4 py-2 rounded-lg font-medium transition-all duration-200 flex items-center justify-center space-x-2 shadow-md hover:shadow-lg"
           >
-            <Shield className="w-4 h-4" />
-            <span>Delta Reasoning Report</span>
+            {/* <Shield className="w-4 h-4" /> */}
+            <span>View Delta Reasoning Report </span>
           </button>
         </div>
       )}
@@ -1383,12 +1337,12 @@ const getAccuracyColor = (accuracy) => {
         <div className="fixed bottom-14 right-5 z-50 flex items-center gap-3">
           {hoveredItem && (
             <div className="p-2 w-64 bg-gray-900 text-white rounded-lg shadow-2xl animate-fadeIn mt-[30%]">
-              <p className="text-xs leading-relaxed">
-                {
+              {/* <p className="text-xs leading-relaxed"> */}
+                {/* {
                   legendData.find((item) => item.id === hoveredItem)
                     ?.description
-                }
-              </p>
+                } */}
+              {/* </p> */}
             </div>
           )}
           {/* <div className="bg-white rounded-xl shadow-2xl p-2 max-w-xs border border-gray-200">
@@ -1458,18 +1412,14 @@ const getAccuracyColor = (accuracy) => {
 
 {/* Delta Quality Report Modal */}
 {showDeltaModal && selectedDeltaData && (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-    <div className="bg-white rounded-2xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-      {/* Modal Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6 flex items-center justify-between">
+  <div className="fixed right-0 top-0 h-full w-[35vw] p-2 bg-white/5 backdrop-blur-sm border-l border-white/10 overflow-y-auto z-50">
+    <div className="h-full bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+
+      {/* Header */}
+      <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-2 flex items-center justify-between">
         <div className="flex items-center space-x-3">
-          <Shield className="w-8 h-8" />
-          <div>
-            <h2 className="text-2xl font-bold">Delta Reasoning Report</h2>
-            <p className="text-purple-100 text-sm mt-1">
-              {selectedDeltaData.source_filename} • {selectedDeltaData.source_language?.toUpperCase()} → {selectedDeltaData.target_language?.toUpperCase()}
-            </p>
-          </div>
+          <Shield className="w-6 h-6 ml-2" />
+          <h2 className="text-xl font-bold">Delta Reasoning Report</h2>
         </div>
         <button
           onClick={closeDeltaModal}
@@ -1479,179 +1429,14 @@ const getAccuracyColor = (accuracy) => {
         </button>
       </div>
 
-      {/* Modal Content */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-6">
-        {/* Summary Section */}
-        <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-xl p-6 border-2 border-purple-200">
-          <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center space-x-2">
-            <TrendingUp className="w-5 h-5 text-blue-600" />
-            <span>Summary</span>
-          </h3>
-          <div className="grid grid-cols-3 gap-4">
-            <div className="bg-white rounded-lg p-4 border border-purple-200">
-              <p className="text-sm text-gray-600 mb-1">Total Issues</p>
-              <p className="text-3xl font-bold text-blue-600">
-                {selectedDeltaData.summary?.total_issues || 0}
-              </p>
-            </div>
-            <div className="bg-white rounded-lg p-4 border border-purple-200">
-              <p className="text-sm text-gray-600 mb-1">Severity</p>
-              <p className={`text-2xl font-bold capitalize ${
-                selectedDeltaData.summary?.severity === 'high' ? 'text-red-600' :
-                selectedDeltaData.summary?.severity === 'medium' ? 'text-yellow-600' :
-                'text-green-600'
-              }`}>
-                {selectedDeltaData.summary?.severity || 'N/A'}
-              </p>
-            </div>
-            <div className="bg-white rounded-lg p-4 border border-purple-200">
-              <p className="text-sm text-gray-600 mb-1">Overall Quality</p>
-              <p className={`text-2xl font-bold capitalize ${
-                selectedDeltaData.summary?.overall_quality === 'excellent' ? 'text-green-600' :
-                selectedDeltaData.summary?.overall_quality === 'good' ? 'text-blue-600' :
-                selectedDeltaData.summary?.overall_quality === 'fair' ? 'text-yellow-600' :
-                'text-red-600'
-              }`}>
-                {selectedDeltaData.summary?.overall_quality || 'N/A'}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Issues by Category */}
-        <div className="space-y-4">
-          {/* Incorrect Translation */}
-          {selectedDeltaData.categories?.incorrect_translation?.length > 0 && (
-            <div className="bg-red-50 rounded-xl p-5 border-2 border-red-200">
-              <h4 className="text-lg font-bold text-red-800 mb-3 flex items-center space-x-2">
-                <AlertTriangle className="w-5 h-5" />
-                <span>Incorrect Translations ({selectedDeltaData.categories.incorrect_translation.length})</span>
-              </h4>
-              <div className="space-y-3">
-                {selectedDeltaData.categories.incorrect_translation.map((issue, idx) => (
-                  <div key={issue.issue_id || idx} className="bg-white rounded-lg p-4 border border-red-300">
-                    <div className="flex items-start space-x-3">
-                      <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-                      <div className="flex-1 min-w-0">
-                        <div className="bg-red-100 rounded p-2 mb-2 break-words">
-                          <p className="text-sm font-mono text-red-900">{issue.term}</p>
-                        </div>
-                        <p className="text-sm text-gray-700 mb-2">
-                          <span className="font-semibold text-green-700">Should be:</span> {issue.should_be}
-                        </p>
-                        <p className="text-xs text-gray-600 italic">
-                          <span className="font-semibold">Reason:</span> {issue.reason}
-                        </p>
-                        {issue.context && (
-                          <details className="mt-2">
-                            <summary className="text-xs text-gray-500 cursor-pointer hover:text-gray-700">
-                              View context
-                            </summary>
-                            <p className="text-xs text-gray-600 mt-1 bg-gray-50 p-2 rounded">
-                              {issue.context}
-                            </p>
-                          </details>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Non-Translated Text */}
-          {selectedDeltaData.categories?.non_translated?.length > 0 && (
-            <div className="bg-orange-50 rounded-xl p-5 border-2 border-orange-200">
-              <h4 className="text-lg font-bold text-orange-800 mb-3 flex items-center space-x-2">
-                <Globe className="w-5 h-5" />
-                <span>Non-Translated Text ({selectedDeltaData.categories.non_translated.length})</span>
-              </h4>
-              <div className="space-y-3">
-                {selectedDeltaData.categories.non_translated.map((issue, idx) => (
-                  <div key={issue.issue_id || idx} className="bg-white rounded-lg p-4 border border-orange-300">
-                    <div className="flex items-start space-x-3">
-                      <Globe className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" />
-                      <div className="flex-1">
-                        <div className="bg-orange-100 rounded p-2 mb-2">
-                          <p className="text-sm font-mono text-orange-900">"{issue.text}"</p>
-                        </div>
-                        <p className="text-sm text-gray-700 mb-1">
-                          <span className="font-semibold">Expected language:</span> {issue.expected_lang}
-                        </p>
-                        <p className="text-xs text-gray-600 italic">{issue.reason}</p>
-                        {issue.context && (
-                          <details className="mt-2">
-                            <summary className="text-xs text-gray-500 cursor-pointer hover:text-gray-700">
-                              View context
-                            </summary>
-                            <p className="text-xs text-gray-600 mt-1 bg-gray-50 p-2 rounded">
-                              {issue.context}
-                            </p>
-                          </details>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Corrupted Text */}
-          {selectedDeltaData.categories?.corrupted_text?.length > 0 && (
-            <div className="bg-yellow-50 rounded-xl p-5 border-2 border-yellow-200">
-              <h4 className="text-lg font-bold text-yellow-800 mb-3 flex items-center space-x-2">
-                <FileWarning className="w-5 h-5" />
-                <span>Corrupted Text ({selectedDeltaData.categories.corrupted_text.length})</span>
-              </h4>
-              <div className="space-y-3">
-                {selectedDeltaData.categories.corrupted_text.map((issue, idx) => (
-                  <div key={issue.issue_id || idx} className="bg-white rounded-lg p-4 border border-yellow-300">
-                    <div className="flex items-start space-x-3">
-                      <FileWarning className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
-                      <div className="flex-1">
-                        <div className="bg-yellow-100 rounded p-2 mb-2">
-                          <p className="text-sm font-mono text-yellow-900">{issue.text}</p>
-                        </div>
-                        <p className="text-sm text-gray-700 mb-1">
-                          <span className="font-semibold text-green-700">Should be:</span> {issue.should_be}
-                        </p>
-                        <p className="text-xs text-gray-600 italic">{issue.reason}</p>
-                        {issue.context && (
-                          <details className="mt-2">
-                            <summary className="text-xs text-gray-500 cursor-pointer hover:text-gray-700">
-                              View context
-                            </summary>
-                            <p className="text-xs text-gray-600 mt-1 bg-gray-50 p-2 rounded">
-                              {issue.context}
-                            </p>
-                          </details>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* No Issues Found */}
-          {selectedDeltaData.summary?.total_issues === 0 && (
-            <div className="bg-green-50 rounded-xl p-8 border-2 border-green-200 text-center">
-              <CheckCircle className="w-16 h-16 text-green-600 mx-auto mb-4" />
-              <h4 className="text-xl font-bold text-green-800 mb-2">
-                Excellent Translation Quality!
-              </h4>
-              <p className="text-green-700">
-                No issues were detected in this translation.
-              </p>
-            </div>
-          )}
-        </div>
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto">
+        <pre className="whitespace-pre-wrap font-mono text-sm bg-white p-4 leading-relaxed overflow-x-auto">
+          {selectedDeltaData.raw}
+        </pre>
       </div>
 
-      {/* Modal Footer */}
+      {/* Footer */}
       <div className="bg-gray-50 p-4 border-t border-gray-200 flex justify-end space-x-3">
         <button
           onClick={closeDeltaModal}
@@ -1659,17 +1444,24 @@ const getAccuracyColor = (accuracy) => {
         >
           Close
         </button>
+
         <button
           onClick={() => {
-            navigator.clipboard.writeText(JSON.stringify(selectedDeltaData, null, 2));
-            toast.success('Quality report copied to clipboard!');
+            const blob = new Blob([selectedDeltaData.raw], { type: "text/plain" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = selectedDeltaData.filename || "delta_reasoning_report.txt";
+            a.click();
+            URL.revokeObjectURL(url);
           }}
           className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors flex items-center space-x-2"
         >
-          <Copy className="w-4 h-4" />
-          <span>Copy Report</span>
+          <Download className="w-4 h-4" />
+          <span>Download TXT Report</span>
         </button>
       </div>
+
     </div>
   </div>
 )}

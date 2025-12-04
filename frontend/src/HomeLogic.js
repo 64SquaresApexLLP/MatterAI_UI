@@ -574,7 +574,7 @@ export const useHomeLogic = () => {
   const [isExpanded, setIsExpanded] = useState(true);
 
   const [showDeltaModal, setShowDeltaModal] = useState(true);
-  const [selectedDeltaData, setSelectedDeltaData] = useState(null);
+  const [selectedDeltaData, setSelectedDeltaData] = useState(true);
   const [loadingDelta, setLoadingDelta] = useState(true);
 
   useEffect(() => {
@@ -1718,49 +1718,46 @@ const fetchDeltaData = async (deltaId, jobId) => {
   }
 
   setLoadingDelta(true);
-  const loadingToast = toast ? toast.loading("Loading translation quality report...") : null;
+  const loadingToast = toast ? toast.loading("Loading Delta report...") : null;
 
   try {
     console.log(`Fetching delta data for delta_id: ${deltaId}`);
+
     const response = await fetch(`${TRANSLATION_API_BASE_URL}/delta/${deltaId}`, {
       method: 'GET',
     });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
-      throw new Error(errorData.detail || `HTTP ${response.status}: ${response.statusText}`);
+      const errorText = await response.text();
+      throw new Error(errorText || `HTTP ${response.status}`);
     }
 
-    const deltaData = await response.json();
-    console.log('Delta data received:', deltaData);
+    const rawText = await response.text();   // ✔️ correct
+    console.log("Delta TXT received:", rawText);
 
-    setSelectedDeltaData(deltaData);
+    setSelectedDeltaData({
+      raw: rawText,
+    });
     setShowDeltaModal(true);
 
-    if (toast) {
-      toast.update(loadingToast, {
-        render: "Quality report loaded successfully!",
-        type: "success",
-        isLoading: false,
-        autoClose: 2000,
-      });
-    }
+    toast?.update(loadingToast, {
+      render: "Delta reasoning loaded!",
+      type: "success",
+      isLoading: false,
+      autoClose: 2000,
+    });
 
-    return deltaData;
+    return rawText;
+
   } catch (error) {
-    console.error(`Delta fetch error for ${deltaId}:`, error);
-    const errorMessage = `Failed to load quality report: ${error.message}`;
-    
-    if (toast) {
-      toast.update(loadingToast, {
-        render: errorMessage,
-        type: "error",
-        isLoading: false,
-        autoClose: 5000,
-      });
-    } else {
-      alert(errorMessage);
-    }
+    console.error("Delta fetch error:", error);
+
+    toast?.update(loadingToast, {
+      render: `Delta load failed: ${error.message}`,
+      type: "error",
+      isLoading: false,
+      autoClose: 5000,
+    });
   } finally {
     setLoadingDelta(false);
   }
