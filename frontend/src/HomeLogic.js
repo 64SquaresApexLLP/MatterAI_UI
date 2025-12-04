@@ -573,9 +573,9 @@ export const useHomeLogic = () => {
   const [showFileTypeDropdown, setShowFileTypeDropdown] = useState(false);
   const [isExpanded, setIsExpanded] = useState(true);
 
-  const [showDeltaModal, setShowDeltaModal] = useState(true);
-  const [selectedDeltaData, setSelectedDeltaData] = useState(true);
-  const [loadingDelta, setLoadingDelta] = useState(true);
+  const [showDeltaModal, setShowDeltaModal] = useState(false);
+  const [selectedDeltaData, setSelectedDeltaData] = useState(null);
+  const [loadingDelta, setLoadingDelta] = useState(false);
 
   useEffect(() => {
     const randomPercentage = Math.floor(Math.random() * (90 - 80 + 1)) + 80;
