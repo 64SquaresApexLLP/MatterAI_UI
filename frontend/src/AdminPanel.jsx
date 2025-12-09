@@ -12,6 +12,39 @@ import {
 import { adminAPI, authAPI } from "./api/apiService";
 
 const AdminPanel = ({ currentUser, onClose }) => {
+  const [crudType, setCrudType] = useState("users");
+
+  const dummyData = {
+    users: [
+      { id: 1, username: "john", email: "john@example.com", role: "User" },
+      { id: 2, username: "alex", email: "alex@example.com", role: "User" },
+    ],
+    orgAdmins: [
+      {
+        id: 10,
+        username: "orgadmin1",
+        email: "oa1@example.com",
+        role: "OrgAdmin",
+      },
+      {
+        id: 11,
+        username: "orgadmin2",
+        email: "oa2@example.com",
+        role: "OrgAdmin",
+      },
+    ],
+  };
+
+  const handleEdit = (item) => {
+    console.log("Edit clicked:", item);
+    showMessage(`Edit clicked for ${item.username}`, "success");
+  };
+
+  const handleDelete = (id) => {
+    console.log("Delete clicked:", id);
+    showMessage(`Delete clicked for ID ${id}`, "error");
+  };
+
   const [activeTab, setActiveTab] = useState(null); // "createUser" | "createOrg" | "createOrgAdmin"
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
@@ -552,6 +585,99 @@ const AdminPanel = ({ currentUser, onClose }) => {
                   <span>Create User</span>
                 </button>
               </form>
+            )}
+
+            {/* CRUD Section */}
+            {(isSuperAdmin || isOrgAdmin) && (
+              <>
+                <button
+                  onClick={() =>
+                    setActiveTab(activeTab === "manage" ? null : "manage")
+                  }
+                  className="w-full p-4 bg-gradient-to-r from-purple-50 to-purple-100 border-2 border-purple-300 rounded-lg hover:shadow-lg transition flex items-center justify-between"
+                >
+                  <div className="flex items-center space-x-3">
+                    <Users className="w-5 h-5 text-purple-600" />
+                    <span className="font-semibold text-[#062e69]">
+                      Manage Records (CRUD)
+                    </span>
+                  </div>
+                  <ChevronDown
+                    className={`w-5 h-5 transition ${
+                      activeTab === "manage" ? "rotate-180" : ""
+                    }`}
+                  />
+                </button>
+
+                {activeTab === "manage" && (
+                  <div className="bg-gray-50 p-6 rounded-lg space-y-4">
+                    {/* Dropdown */}
+                    <div>
+                      <label className="block text-sm font-semibold text-[#062e69] mb-2">
+                        Select Entity
+                      </label>
+                      <select
+                        value={crudType}
+                        onChange={(e) => setCrudType(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                      >
+                        {isSuperAdmin && (
+                          <option value="orgAdmins">Org Admins</option>
+                        )}
+                        <option value="users">Users</option>
+                      </select>
+                    </div>
+
+                    {/* Table */}
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full bg-white border rounded-lg shadow-sm">
+                        <thead>
+                          <tr className="bg-purple-100 text-left text-sm font-semibold">
+                            <th className="px-4 py-3 border">ID</th>
+                            <th className="px-4 py-3 border">Username</th>
+                            <th className="px-4 py-3 border">Email</th>
+                            <th className="px-4 py-3 border">Role</th>
+                            <th className="px-4 py-3 border text-center">
+                              Actions
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {dummyData[crudType].map((item) => (
+                            <tr
+                              key={item.id}
+                              className="border-t hover:bg-gray-50"
+                            >
+                              <td className="px-4 py-3 border">{item.id}</td>
+                              <td className="px-4 py-3 border">
+                                {item.username}
+                              </td>
+                              <td className="px-4 py-3 border">{item.email}</td>
+                              <td className="px-4 py-3 border">{item.role}</td>
+
+                              <td className="px-4 py-3 border text-center flex items-center justify-center space-x-4">
+                                <button
+                                  onClick={() => handleEdit(item)}
+                                  className="text-blue-600 hover:text-blue-800"
+                                >
+                                  <Users className="w-5 h-5" />
+                                </button>
+
+                                <button
+                                  onClick={() => handleDelete(item.id)}
+                                  className="text-red-600 hover:text-red-800"
+                                >
+                                  <X className="w-5 h-5" />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>

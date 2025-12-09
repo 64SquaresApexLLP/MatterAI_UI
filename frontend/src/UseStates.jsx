@@ -1,5 +1,4 @@
-// src/hooks/usePreviewState.js
-import { useState, useRef } from 'react';
+import { useState, useRef } from "react";
 
 const UseStates = () => {
   const [numPages, setNumPages] = useState(null);
