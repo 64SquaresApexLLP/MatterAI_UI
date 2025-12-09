@@ -260,7 +260,7 @@ const AdminPanel = ({ currentUser, onClose }) => {
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="sticky top-0 bg-gradient-to-r from-[#062e69] to-blue-600 text-white p-6 flex items-center justify-between">
+        <div className="z-50 sticky top-0 bg-gradient-to-r from-[#062e69] to-blue-600 text-white p-6 flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <Users className="w-6 h-6" />
             <h2 className="text-2xl font-bold">Admin Panel</h2>
