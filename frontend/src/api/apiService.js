@@ -285,6 +285,22 @@ export const adminAPI = {
   getUser: async (userId) => {
     return await apiCall(`/users/${userId}`);
   },
+  listUsers: async () => {
+    return await apiCall(`/users/`);
+  },
+
+  updateUser: async (userId, userData) => {
+    return await apiCall(`/users/${userId}`, {
+      method: HTTP_METHODS.PUT,
+      body: JSON.stringify(userData),
+    });
+  },
+
+  deleteUser: async (userId) => {
+    return await apiCall(`/users/${userId}`, {
+      method: HTTP_METHODS.DELETE,
+    });
+  },
 
   // Organization Management
   createOrganization: async (orgData) => {

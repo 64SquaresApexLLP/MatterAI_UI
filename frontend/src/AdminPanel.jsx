@@ -10,6 +10,7 @@ import {
   Loader,
 } from "lucide-react";
 import { adminAPI, authAPI } from "./api/apiService";
+import UsersTable from "./UsersTable";
 
 const AdminPanel = ({ currentUser, onClose }) => {
   const [activeTab, setActiveTab] = useState(null); // "createUser" | "createOrg" | "createOrgAdmin"
@@ -29,7 +30,6 @@ const AdminPanel = ({ currentUser, onClose }) => {
 
   const [roles, setRoles] = useState([]);
   const [orgs, setOrgs] = useState([]);
-  const [loadingLists, setLoadingLists] = useState(false);
 
   const [orgFormData, setOrgFormData] = useState({
     org_name: "",
@@ -120,7 +120,6 @@ const AdminPanel = ({ currentUser, onClose }) => {
   useEffect(() => {
     let mounted = true;
     const fetchLists = async () => {
-      setLoadingLists(true);
       try {
         const rolesRes = await authAPI.getRoles();
         const orgRes = await authAPI.getOrganizations();
@@ -163,7 +162,7 @@ const AdminPanel = ({ currentUser, onClose }) => {
       } catch (err) {
         console.error("Failed to load roles/orgs:", err);
       } finally {
-        if (mounted) setLoadingLists(false);
+        // no-op
       }
     };
 
@@ -425,6 +424,29 @@ const AdminPanel = ({ currentUser, onClose }) => {
               </button>
             )}
 
+            {(isSuperAdmin || isOrgAdmin) && (
+              <button
+                onClick={() =>
+                  setActiveTab(
+                    activeTab === "manageUsers" ? null : "manageUsers"
+                  )
+                }
+                className="w-full p-4 bg-gradient-to-r from-yellow-50 to-yellow-100 border-2 border-yellow-300 rounded-lg hover:shadow-lg transition flex items-center justify-between"
+              >
+                <div className="flex items-center space-x-3">
+                  <Users className="w-5 h-5 text-yellow-600" />
+                  <span className="font-semibold text-[#062e69]">
+                    Manage Users
+                  </span>
+                </div>
+                <ChevronDown
+                  className={`w-5 h-5 transition ${
+                    activeTab === "manageUsers" ? "rotate-180" : ""
+                  }`}
+                />
+              </button>
+            )}
+
             {activeTab === "createUser" && (
               <form
                 onSubmit={handleCreateUser}
@@ -552,6 +574,17 @@ const AdminPanel = ({ currentUser, onClose }) => {
                   <span>Create User</span>
                 </button>
               </form>
+            )}
+
+            {activeTab === "manageUsers" && (
+              <div className="bg-gray-50 p-4 rounded-lg space-y-4">
+                <UsersTable
+                  currentUser={currentUser}
+                  roles={roles}
+                  orgs={orgs}
+                  refreshTrigger={activeTab}
+                />
+              </div>
             )}
           </div>
         </div>
