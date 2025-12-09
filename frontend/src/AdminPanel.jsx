@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Users,
   Building2,
@@ -9,7 +9,7 @@ import {
   CheckCircle,
   Loader,
 } from "lucide-react";
-import { adminAPI } from "./api/apiService";
+import { adminAPI, authAPI } from "./api/apiService";
 
 const AdminPanel = ({ currentUser, onClose }) => {
   const [activeTab, setActiveTab] = useState(null); // "createUser" | "createOrg" | "createOrgAdmin"
@@ -26,6 +26,10 @@ const AdminPanel = ({ currentUser, onClose }) => {
     role_id: "",
     org_id: "",
   });
+
+  const [roles, setRoles] = useState([]);
+  const [orgs, setOrgs] = useState([]);
+  const [loadingLists, setLoadingLists] = useState(false);
 
   const [orgFormData, setOrgFormData] = useState({
     org_name: "",
@@ -54,6 +58,7 @@ const AdminPanel = ({ currentUser, onClose }) => {
 
   const handleCreateUser = async (e) => {
     e.preventDefault();
+    // Basic client-side validation to match backend expectations
     if (
       !formData.username ||
       !formData.email ||
@@ -61,6 +66,16 @@ const AdminPanel = ({ currentUser, onClose }) => {
       !formData.name
     ) {
       showMessage("All fields are required", "error");
+      return;
+    }
+
+    if (String(formData.username).length < 3) {
+      showMessage("Username must be at least 3 characters", "error");
+      return;
+    }
+
+    if (String(formData.password).length < 6) {
+      showMessage("Password must be at least 6 characters", "error");
       return;
     }
 
@@ -73,10 +88,9 @@ const AdminPanel = ({ currentUser, onClose }) => {
         name: formData.name,
       };
 
-      if (currentUser.role_name === "SuperAdmin") {
-        if (formData.role_id) payload.role_id = parseInt(formData.role_id);
-        if (formData.org_id) payload.org_id = parseInt(formData.org_id);
-      }
+      // Attach optional IDs if provided (send as integers)
+      if (formData.role_id) payload.role_id = parseInt(formData.role_id);
+      if (formData.org_id) payload.org_id = parseInt(formData.org_id);
 
       const response = await adminAPI.createUser(payload);
       if (response.success) {
@@ -102,6 +116,62 @@ const AdminPanel = ({ currentUser, onClose }) => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    let mounted = true;
+    const fetchLists = async () => {
+      setLoadingLists(true);
+      try {
+        const rolesRes = await authAPI.getRoles();
+        const orgRes = await authAPI.getOrganizations();
+
+        const rawRoles = rolesRes?.roles || rolesRes?.data || rolesRes || [];
+        const normalizedRoles = Array.isArray(rawRoles)
+          ? rawRoles.map((r, idx) => ({
+              id: r.id ?? r.role_id ?? r.roleId ?? idx,
+              role_name:
+                r.role_name ??
+                r.name ??
+                r.role ??
+                r.roleName ??
+                String(r.id ?? idx),
+              description: r.description ?? r.desc ?? "",
+            }))
+          : [];
+
+        const rawOrgs = orgRes?.organizations || orgRes?.data || orgRes || [];
+        const normalizedOrgs = Array.isArray(rawOrgs)
+          ? rawOrgs.map((o) => ({
+              id: o.id ?? o.org_id ?? o.orgId,
+              name: o.name ?? o.org_name ?? o.title ?? String(o.id),
+            }))
+          : [];
+
+        if (!mounted) return;
+        setRoles(normalizedRoles);
+        setOrgs(normalizedOrgs);
+
+        if (currentUser?.role_name === "OrgAdmin") {
+          const curOrgId =
+            currentUser?.org_id ||
+            currentUser?.organization?.id ||
+            currentUser?.organization_id ||
+            currentUser?.orgId;
+          if (curOrgId)
+            setFormData((prev) => ({ ...prev, org_id: String(curOrgId) }));
+        }
+      } catch (err) {
+        console.error("Failed to load roles/orgs:", err);
+      } finally {
+        if (mounted) setLoadingLists(false);
+      }
+    };
+
+    fetchLists();
+    return () => {
+      mounted = false;
+    };
+  }, [currentUser]);
 
   const handleCreateOrganization = async (e) => {
     e.preventDefault();
@@ -148,6 +218,11 @@ const AdminPanel = ({ currentUser, onClose }) => {
 
   const isSuperAdmin = currentUser?.role_name === "SuperAdmin";
   const isOrgAdmin = currentUser?.role_name === "OrgAdmin";
+
+  // Determine which roles should be shown in the dropdown based on current user's role
+  const availableRoles = isSuperAdmin
+    ? roles
+    : roles.filter((r) => ["OrgAdmin", "User"].includes(r.role_name));
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
@@ -417,29 +492,52 @@ const AdminPanel = ({ currentUser, onClose }) => {
                     <>
                       <div>
                         <label className="block text-sm font-semibold text-[#062e69] mb-2">
-                          Role ID (Optional)
+                          Role (Optional)
                         </label>
-                        <input
-                          type="number"
+                        <select
                           name="role_id"
                           value={formData.role_id}
                           onChange={handleInputChange}
-                          placeholder="e.g., 1"
                           className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                        />
+                        >
+                          <option value="">Select Role (optional)</option>
+                          {availableRoles && availableRoles.length > 0 ? (
+                            availableRoles.map((r) => (
+                              <option key={r.id} value={r.id}>
+                                {r.role_name}
+                              </option>
+                            ))
+                          ) : (
+                            <option disabled>Loading roles...</option>
+                          )}
+                        </select>
                       </div>
                       <div>
                         <label className="block text-sm font-semibold text-[#062e69] mb-2">
-                          Organization ID (Optional)
+                          Organization (Optional)
                         </label>
-                        <input
-                          type="number"
+                        <select
                           name="org_id"
                           value={formData.org_id}
                           onChange={handleInputChange}
-                          placeholder="e.g., 1"
+                          disabled={isOrgAdmin}
                           className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                        />
+                        >
+                          <option value="">
+                            {isOrgAdmin
+                              ? "Organization (assigned)"
+                              : "Select Organization (optional)"}
+                          </option>
+                          {orgs && orgs.length > 0 ? (
+                            orgs.map((o) => (
+                              <option key={o.id} value={o.id}>
+                                {o.name}
+                              </option>
+                            ))
+                          ) : (
+                            <option disabled>Loading organizations...</option>
+                          )}
+                        </select>
                       </div>
                     </>
                   )}

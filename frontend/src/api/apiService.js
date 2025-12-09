@@ -276,7 +276,7 @@ export const fileAPI = {
 export const adminAPI = {
   // User Management
   createUser: async (userData) => {
-    return await apiCall("/users", {
+    return await apiCall("/users/", {
       method: HTTP_METHODS.POST,
       body: JSON.stringify(userData),
     });
