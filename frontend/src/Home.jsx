@@ -3,8 +3,10 @@ import { jurisdictions, jurisdictionPrompts, legendData, pdfOptions, fileTypeOpt
 import UseStates from "./UseStates.jsx";
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
+import { Shield, FileWarning, Type, Zap } from 'lucide-react';
+
 const Home = ({ user, onBack, onLogout }) => {
-  const { percentage, query, setQuery, selectedButton, selectedLanguage, showLanguageDropdown, setShowLanguageDropdown, uploadedFiles, setUploadedFiles, isDragOver, isTranslating, translationResult, translationJobs, jobStatuses, evaluationData, previewText, showPreview, setShowPreview, fileInputRef, showTimesheet, setShowTimesheet, showEntries, setShowEntries, isListening, textTranslationResult, setTextTranslationResult, chatResponse, setChatResponse, notificationPermission, handleRequestNotificationPermission, previewFile, previewFileType, toggleListening, handleButtonClick, handleLanguageSelect, handleSubmit, handleFileInputChange, handleDragOver, handleDragLeave, handleDrop, removeFile, handleDownload, handleDownloadAll, fetchEvaluation, refreshEvaluations, extractLanguagesFromPrompt, LANGUAGE_MAPPING, isPotentiallyCJK, handleFileConversion } = useHomeLogic();
+  const { percentage, query, setQuery, selectedButton, selectedLanguage, showLanguageDropdown, setShowLanguageDropdown, uploadedFiles, setUploadedFiles, isDragOver, isTranslating, translationResult, translationJobs, jobStatuses, evaluationData, previewText, showPreview, setShowPreview, fileInputRef, showTimesheet, setShowTimesheet, showEntries, setShowEntries, isListening, textTranslationResult, setTextTranslationResult, chatResponse, setChatResponse, notificationPermission, handleRequestNotificationPermission, previewFile, previewFileType, toggleListening, handleButtonClick, handleLanguageSelect, handleSubmit, handleFileInputChange, handleDragOver, handleDragLeave, handleDrop, removeFile, handleDownload, handleDownloadAll, fetchEvaluation, refreshEvaluations, extractLanguagesFromPrompt, LANGUAGE_MAPPING, isPotentiallyCJK, handleFileConversion, showDeltaModal, selectedDeltaData, loadingDelta, handleViewDelta, closeDeltaModal, fetchDeltaData } = useHomeLogic();
   const { numPages, setNumPages, pageNumber, setPageNumber, selectedJobForPreview, setSelectedJobForPreview, previewingFile, setPreviewingFile, showEvaluationDetails, setShowEvaluationDetails, previewUrl, setPreviewUrl, currentPreviewFileType, setCurrentPreviewFileType, useCJKMode, setUseCJKMode, showJurisdictionDropdown, setShowJurisdictionDropdown, docxPreviewRef, selectedJurisdiction, setSelectedJurisdiction, showPromptSection, setShowPromptSection, showOptionsSection, setShowOptionsSection, showFileSelector, setShowFileSelector, convertingToPdf, setConvertingToPdf, hoveredItem, setHoveredItem, selectedTargetFileType, setSelectedTargetFileType, showFileTypeDropdown, setShowFileTypeDropdown, isExpanded, setIsExpanded } = UseStates();
 
   useEffect(() => {
@@ -263,55 +265,6 @@ const Home = ({ user, onBack, onLogout }) => {
     return new Blob(byteArrays, { type: mimeType });
   };
 
-  const handleDownloadPdf = async (jobId) => {
-    try {
-      const jobStatus = jobStatuses[jobId];
-      const selectedJob = translationJobs.find((job) => job.job_id === jobId);
-
-      if (!jobStatus?.download_id || !selectedJob) {
-        console.error("Job not found or not completed");
-        return;
-      }
-
-      const response = await fetch(
-        `${import.meta.env.VITE_TRANSLATION_API_URL}/download/${
-          jobStatus.download_id
-        }`,
-        { method: "GET" }
-      );
-
-      if (!response.ok) {
-        throw new Error("Failed to download file");
-      }
-
-      const blob = await response.blob();
-      const contentType = response.headers.get("content-type") || "";
-
-      if (
-        contentType.includes(
-          "vnd.openxmlformats-officedocument.wordprocessingml.document"
-        ) ||
-        selectedJob.filename.toLowerCase().endsWith(".docx")
-      ) {
-        const { blob: pdfBlob, filename: pdfFilename } =
-          await convertDocxToTextBasedPdf(blob, selectedJob.filename);
-        const url = URL.createObjectURL(pdfBlob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = pdfFilename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        3;
-      } else {
-        alert("PDF download is only available for Word documents");
-      }
-    } catch (error) {
-      alert(error);
-    }
-  };
-
   const convertDocxToTextBasedPdf = async (docxBlob, filename) => {
     setConvertingToPdf(true);
     try {
@@ -427,7 +380,6 @@ const getAccuracyColor = (accuracy) => {
         ? 'opacity-100 pointer-events-auto' 
         : 'opacity-0 pointer-events-none'
     }`}
-    
   >
     <div className="w-full h-full bg-[#062e69]/20 backdrop-blur-md flex items-center justify-center">
       <div className="bg-white/80 w-[50%] h-[50%] backdrop-blur-xl rounded-3xl p-12 border-4 border-dashed border-[#062e69]/70 shadow-2xl flex items-center justify-center">
@@ -532,9 +484,12 @@ const getAccuracyColor = (accuracy) => {
         </div>
       </div>
       <div
-        className={`flex-1 p-6 transition-all duration-300 max-h-screen overflow-y-auto ${
-          showPreview ? "pr-2" : ""
-        }`}
+      className={`
+        // ${showPreview || showDeltaModal ? "w-[30vw]" : "w-full"}
+        ${showPreview && !showDeltaModal ? "w-[50vw]" : showPreview && showDeltaModal ? "w-[30vw]" : "w-full"}
+        transition-all duration-300
+        max-h-screen overflow-y-auto p-6
+      `}
       >
         <div
           className={`relative z-10 w-full mx-auto transition-all duration-300 ${
@@ -577,7 +532,7 @@ const getAccuracyColor = (accuracy) => {
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder={
                     selectedButton === "Translation"
-                      ? "Translate to Spanish, French, and German | Drag & Drop your file for translation"
+                      ? "Translate to Chinese, German, French, English | Drag & Drop your file for translation"
                       : selectedButton === "File_Converter"
                       ? "Convert file to Word/PDF... | Drag & Drop your file for conversion"
                       : "Case related questions..."
@@ -1210,336 +1165,306 @@ const getAccuracyColor = (accuracy) => {
         </div>
       </div>
       {showPreview && ( 
-        <div className="w-1/2 p-2 bg-white/5 backdrop-blur-sm border-l border-white/10 animate-slide-in-right overflow-y-auto max-h-screen">
-          <div className="h-full bg-white/95 backdrop-blur-xl border border-[#062e69]/30 rounded-2xl shadow-lg flex flex-col overflow-y-auto max-h-screen">
-            <div className="flex items-center justify-between p-2">
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={handleClosePreview}
-                  className="p-1 text-[#062e69]/60 hover:text-red-500 transition-colors rounded-lg hover:bg-red-50"
-                  title="Close Preview"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-                {/* <Eye className="w-5 h-5 text-[#062e69]" /> */}
-                <h3 className="text-lg font-semibold text-[#062e69]">
-                  Select file to preview:
-                </h3>
+    <div className={`fixed top-0 h-full ${showDeltaModal ? "right-[35vw] w-[35vw] bg-white/5 backdrop-blur-sm border-l border-white/10" : "right-0 w-[50vw]"} p-2 overflow-y-auto z-40`}>
+    <div className="h-full bg-white/95 backdrop-blur-xl border border-[#062e69]/30 rounded-2xl shadow-lg flex flex-col overflow-y-auto max-h-screen">
+      {/* Header Section */}
+      <div className="flex items-center justify-between p-2">
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={handleClosePreview}
+            className="p-1 text-[#062e69]/60 hover:text-red-500 transition-colors rounded-lg hover:bg-red-50"
+            title="Close Preview"
+          >
+            <X className="w-4 h-4" />
+          </button>
+          <h3 className="text-lg font-semibold text-[#062e69]">
+            Select file to preview:
+          </h3>
 
-                {translationJobs.length > 0 && (
-                  <div className="">
-                    <select
-                      value={selectedJobForPreview || ""}
-                      onChange={(e) => setSelectedJobForPreview(e.target.value)}
-                      className="p-2 border border-[#062e69]/30 rounded-lg bg-white text-[#062e69] focus:outline-none focus:border-[#062e69]/50"
-                    >
-                      <option value="">Choose a file...</option>
-                      {translationJobs
-                        .filter(
-                          (job) =>
-                            jobStatuses[job.job_id]?.status === "COMPLETED"
-                        )
-                        .map((job) => {
-                          const evaluation = evaluationData[job.job_id];
-                          return (
-                            <option key={job.job_id} value={job.job_id}>
-                              {job.filename} -{" "}
-                              {job.target_language.toUpperCase()}
-                              {evaluation?.combined_accuracy !== undefined
-                                ? ` (${evaluation.combined_accuracy}% accuracy)`
-                                : ""}
-                            </option>
-                          );
-                        })}
-                    </select>
-                    {selectedJobForPreview &&
-                      evaluationData[selectedJobForPreview] &&
-                      !evaluationData[selectedJobForPreview].error && (
-                        <div className="mt-3 p-3 bg-[#062e69]/5 rounded-lg border border-[#062e69]/10">
-                          <div className="text-xs space-y-1">
-                            <div className="flex items-center justify-between">
-                              <span className="text-[#062e69]/70">
-                                Source Language:
-                              </span>
-                              <span className="font-medium text-[#062e69]">
-                                {evaluationData[selectedJobForPreview]
-                                  .source_language || "N/A"}
-                              </span>
-                            </div>
-                            <div className="flex items-center justify-between">
-                              <span className="text-[#062e69]/70">Method:</span>
-                              <span className="font-medium text-[#062e69] text-xs">
-                                {evaluationData[selectedJobForPreview]
-                                  .evaluation_method || "N/A"}
-                              </span>
-                            </div>
-                            {evaluationData[selectedJobForPreview]
-                              .detailed_analysis?.overall_assessment && (
-                              <div className="mt-2 pt-2 border-t border-[#062e69]/10">
-                                <p className="text-[#062e69]/80 text-xs italic">
-                                  {
-                                    evaluationData[selectedJobForPreview]
-                                      .detailed_analysis.overall_assessment
-                                  }
-                                </p>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                  </div>
-                )}
-                {useCJKMode && (
-                  <div className="ml-4 px-3 py-1 bg-blue-100 text-blue-800 text-xs rounded-full border border-blue-300">
-                    🌏 CJK Mode
-                  </div>
-                )}
-                {selectedJobForPreview &&
-                  evaluationData[selectedJobForPreview] &&
-                  evaluationData[selectedJobForPreview].combined_accuracy !==
-                    undefined && (
-                    <div
-                      className={`ml-4 px-3 py-1 rounded-full text-sm font-medium border flex items-center space-x-1 ${getAccuracyColor(
-                        evaluationData[selectedJobForPreview].combined_accuracy
-                      )}`}
-                    >
-                      <TrendingUp className="w-4 h-4" />
-                      <span>
-                        Accuracy:{" "}
-                        {
-                          evaluationData[selectedJobForPreview]
-                            .combined_accuracy
-                        }
-                        %
-                      </span>
-                    </div>
-                  )}
-              </div>
-              <button
-                onClick={handleClosePreview}
-                className="p-1 text-[#062e69]/60 hover:text-[#062e69] transition-colors rounded-lg hover:bg-[#062e69]/10"
+          {translationJobs.length > 0 && (
+            <div className="">
+              <select
+                value={selectedJobForPreview || ""}
+                onChange={(e) => setSelectedJobForPreview(e.target.value)}
+                className="p-2 border border-[#062e69]/30 rounded-lg bg-white text-[#062e69] focus:outline-none focus:border-[#062e69]/50"
               >
-                <X className="w-5 h-5" />
-              </button>
+                <option value="">Choose a file...</option>
+                {translationJobs
+                  .filter(
+                    (job) =>
+                      jobStatuses[job.job_id]?.status === "COMPLETED"
+                  )
+                  .map((job) => {
+                    const evaluation = evaluationData[job.job_id];
+                    return (
+                      <option key={job.job_id} value={job.job_id}>
+                        {job.filename} -{" "}
+                        {job.target_language.toUpperCase()}
+                        {evaluation?.combined_accuracy !== undefined
+                          ? ` (${evaluation.combined_accuracy}% accuracy)`
+                          : ""}
+                      </option>
+                    );
+                  })}
+              </select>
             </div>
-            <></>
-            <div className="flex-1 p-0 overflow-y-auto">
-              {useCJKMode &&
-              previewUrl &&
-              currentPreviewFileType === "application/pdf" ? (
-                <iframe
-                  src={previewUrl}
-                  title="PDF Preview"
-                  className="w-full h-full border-0 rounded-lg shadow-lg"
-                  style={{ minHeight: "600px" }}
-                />
-              ) : previewingFile && previewingFile.type === "pdf" ? (
-                <div className="flex flex-col items-center">
-                  <Document
-                    options={pdfOptions}
-                    file={previewingFile.file}
-                    onLoadSuccess={onDocumentLoadSuccess}
-                    loading={
-                      <div className="flex items-center justify-center p-8">
-                        <Loader2 className="w-8 h-8 animate-spin text-[#062e69]" />
-                      </div>
-                    }
-                    error={
-                      <div className="text-red-500 p-4 text-center">
-                        <p className="mb-2">Error loading PDF preview.</p>
-                        <p className="text-sm text-gray-600">
-                          The translated file is still available for download
-                          below.
-                        </p>
-                      </div>
-                    }
-                    onLoadError={(error) => {
-                      console.error("PDF load error:", error);
-                      if (
-                        error.message.includes("font") ||
-                        error.message.includes("character")
-                      ) {
-                        console.warn("Possible CJK font issue detected");
-                      }
-                    }}
-                  >
-                    <Page
-                      pageNumber={pageNumber}
-                      renderTextLayer={true}
-                      renderAnnotationLayer={true}
-                      className="shadow-lg"
-                      width={Math.min(window.innerWidth * 0.4, 800)}
-                      onLoadError={(error) => {
-                        console.error("PDF page load error:", error);
-                      }}
-                    />
-                  </Document>
-                  {numPages && numPages > 1 && (
-                    <div className="mt-4 flex items-center gap-4 bg-[#062e69]/10 px-4 py-2 rounded-lg">
-                      <button
-                        onClick={goToPrevPage}
-                        disabled={pageNumber <= 1}
-                        className="px-3 py-1 bg-[#062e69] text-white rounded disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        Previous
-                      </button>
-                      <span className="text-[#062e69] font-medium">
-                        Page {pageNumber} of {numPages}
-                      </span>
-                      <button
-                        onClick={goToNextPage}
-                        disabled={pageNumber >= numPages}
-                        className="px-3 py-1 bg-[#062e69] text-white rounded disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        Next
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ) : previewingFile && previewingFile.type === "docx" ? (
-                <div
-                  ref={docxPreviewRef}
-                  className="docx-preview-container bg-white p-1 pt-0 pb-0 rounded-lg shadow-inner"
-                  style={{
-                    minHeight: "500px",
-                    maxWidth: "100%",
-                    overflow: "auto",
-                  }}
-                />
-              ) : selectedJobForPreview ? (
-                <div className="flex items-center justify-center h-full text-[#062e69]/60">
-                  <div className="text-center">
-                    <Loader2 className="w-12 h-12 mx-auto mb-2 opacity-40 animate-spin" />
-                    <p className="text-sm">Loading preview...</p>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-center justify-center h-full text-[#062e69]/60">
-                  <div className="text-center">
-                    <FileText className="w-12 h-12 mx-auto mb-2 opacity-40" />
-                    <p className="text-sm">
-                      {translationJobs.length > 0
-                        ? "Select a completed file to preview"
-                        : "No files available for preview"}
-                    </p>
-                  </div>
-                </div>
-              )}
+          )}
+          {useCJKMode && (
+            <div className="ml-4 px-3 py-1 bg-blue-100 text-blue-800 text-xs rounded-full border border-blue-300">
+              🌏 CJK Mode
             </div>
-            <div className="p-1 border-t border-[#062e69]/10">
-              <div className="fixed bottom-14 right-5 z-50 flex items-center gap-3">
-                {hoveredItem && (
-                  <div className="p-2 w-64 bg-gray-900 text-white rounded-lg shadow-2xl animate-fadeIn mt-[30%]">
-                    <p className="text-xs leading-relaxed">
-                      {
-                        legendData.find((item) => item.id === hoveredItem)
-                          ?.description
-                      }
-                    </p>
-                  </div>
-                )}
-                {/* Delta Legend Box */}
-                <div className="bg-white rounded-xl shadow-2xl p-2 max-w-xs border border-gray-200">
-      <div
-        className="flex justify-between items-center cursor-pointer"
-        onClick={() => setIsExpanded(!isExpanded)}
-      >
-        <h3 className="text-sm font-bold text-gray-800 mb-0 pb-0 pr-2">
-          Delta Legend
-        </h3>
-        <button className="text-gray-500 hover:text-gray-700 focus:outline-none pb-1">
-          {isExpanded ? '−' : '+'}
+          )}
+        </div>
+        <button
+          onClick={handleClosePreview}
+          className="p-1 text-[#062e69]/60 hover:text-[#062e69] transition-colors rounded-lg hover:bg-[#062e69]/10"
+        >
+          <X className="w-5 h-5" />
         </button>
       </div>
-      {isExpanded && (
-        <div className="space-y-2 max-h-96 overflow-y-auto">
-          {legendData.map((item) => (
-            <div
-              key={item.id}
-              className="flex items-center gap-2 p-0 transition-all duration-200 cursor-pointer"
-              onMouseEnter={() => setHoveredItem(item.id)}
-              onMouseLeave={() => setHoveredItem(null)}
-            >
-              <div
-                className="w-4 h-4 rounded shadow-sm flex-shrink-0 transition-transform duration-200 hover:scale-110"
-                style={{ backgroundColor: item.color }}
-              />
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium text-gray-700 hover:text-black truncate">
-                  {item.label}
-                </p>
-              </div>
-            </div>
-          ))}
+
+      {/* NEW: Delta Quality Report Button */}
+      {selectedJobForPreview && 
+       jobStatuses[selectedJobForPreview]?.delta_id && (
+        <div className="px-4 pb-2">
+          <button
+            onClick={() => handleViewDelta(selectedJobForPreview)}
+            className="w-full bg-gradient-to-r from-blue-700 to-blue-800 hover:from-blue-800 hover:to-blue-900 text-white px-4 py-2 rounded-lg font-medium transition-all duration-200 flex items-center justify-center space-x-2 shadow-md hover:shadow-lg"
+          >
+            {/* <Shield className="w-4 h-4" /> */}
+            <span>View Delta Reasoning Report </span>
+          </button>
         </div>
       )}
-    </div>
-              </div>
-              {false
-              // previewingFile && previewingFile.type === "docx" 
-              ? (
-                <div></div>
-                // <div className="flex space-x-2">
-                //   <button
-                //     onClick={() => handleDownload(selectedJobForPreview)}
-                //     disabled={
-                //       !selectedJobForPreview ||
-                //       !jobStatuses[selectedJobForPreview]?.download_id
-                //     }
-                //     className="flex-1 bg-gradient-to-r from-[#062e69] to-[#062e69]/80 hover:from-[#062e69]/90 hover:to-[#062e69] text-white px-4 py-3 rounded-xl font-medium transition-all duration-200 transform hover:scale-101 hover:shadow-lg hover:shadow-[#062e69]/25 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-                //   >
-                //     <Download className="w-4 h-4" />
-                //     <span>Download Word</span>
-                //   </button>
-                //   <button
-                //     onClick={() => handleDownloadPdf(selectedJobForPreview)}
-                //     disabled={
-                //       !selectedJobForPreview ||
-                //       !jobStatuses[selectedJobForPreview]?.download_id ||
-                //       convertingToPdf
-                //     }
-                //     className="flex-1 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white px-4 py-3 rounded-xl font-medium transition-all duration-200 transform hover:scale-101 hover:shadow-lg hover:shadow-green-500/25 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-                //   >
-                //     {convertingToPdf ? (
-                //       <Loader2 className="w-4 h-4 animate-spin" />
-                //     ) : (
-                //       <FileText className="w-4 h-4" />
-                //     )}
-                //     <span>
-                //       {convertingToPdf ? "Converting..." : "Download PDF"}
-                //     </span>
-                //   </button>
-                // </div>
-              ) : (
-                <center>
+
+      {/* Preview Content */}
+      <div className="flex-1 p-0 overflow-y-auto">
+        {useCJKMode &&
+        previewUrl &&
+        currentPreviewFileType === "application/pdf" ? (
+          <iframe
+            src={previewUrl}
+            title="PDF Preview"
+            className="w-full h-full border-0 rounded-lg shadow-lg"
+            style={{ minHeight: "600px" }}
+          />
+        ) : previewingFile && previewingFile.type === "pdf" ? (
+          <div className="flex flex-col items-center">
+            <Document
+              options={pdfOptions}
+              file={previewingFile.file}
+              onLoadSuccess={onDocumentLoadSuccess}
+              loading={
+                <div className="flex items-center justify-center p-8">
+                  <Loader2 className="w-8 h-8 animate-spin text-[#062e69]" />
+                </div>
+              }
+              error={
+                <div className="text-red-500 p-4 text-center">
+                  <p className="mb-2">Error loading PDF preview.</p>
+                  <p className="text-sm text-gray-600">
+                    The translated file is still available for download below.
+                  </p>
+                </div>
+              }
+              onLoadError={(error) => {
+                console.error("PDF load error:", error);
+              }}
+            >
+              <Page
+                pageNumber={pageNumber}
+                renderTextLayer={true}
+                renderAnnotationLayer={true}
+                className="shadow-lg"
+                width={Math.min(window.innerWidth * 0.4, 800)}
+              />
+            </Document>
+            {numPages && numPages > 1 && (
+              <div className="mt-4 flex items-center gap-4 bg-[#062e69]/10 px-4 py-2 rounded-lg">
                 <button
-                  onClick={() =>
-                    selectedJobForPreview &&
-                    handleDownload(selectedJobForPreview)
-                  }
-                  disabled={
-                    !selectedJobForPreview ||
-                    !jobStatuses[selectedJobForPreview]?.download_id
-                  }
-                  className="w-full bg-gradient-to-r from-[#062e69] to-[#062e69]/80 hover:from-[#062e69]/90 hover:to-[#062e69] text-white px-4 py-3 rounded-xl font-medium transition-all duration-200 transform hover:scale-100 hover:shadow-lg hover:shadow-[#062e69]/25 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                  onClick={goToPrevPage}
+                  disabled={pageNumber <= 1}
+                  className="px-3 py-1 bg-[#062e69] text-white rounded disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <Download className="w-4 h-4" />
-                  <span>
-                    {selectedJobForPreview
-                      ? `Download ${
-                          translationJobs.find(
-                            (j) => j.job_id === selectedJobForPreview
-                          )?.filename || "File"
-                        }`
-                        : "Select file to download"}
-                  </span>
+                  Previous
                 </button>
-                </center>
-              )}
+                <span className="text-[#062e69] font-medium">
+                  Page {pageNumber} of {numPages}
+                </span>
+                <button
+                  onClick={goToNextPage}
+                  disabled={pageNumber >= numPages}
+                  className="px-3 py-1 bg-[#062e69] text-white rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
+            )}
+          </div>
+        ) : previewingFile && previewingFile.type === "docx" ? (
+          <div
+            ref={docxPreviewRef}
+            className="docx-preview-container bg-white p-1 pt-0 pb-0 rounded-lg shadow-inner"
+            style={{
+              minHeight: "500px",
+              maxWidth: "100%",
+              overflow: "auto",
+            }}
+          />
+        ) : selectedJobForPreview ? (
+          <div className="flex items-center justify-center h-full text-[#062e69]/60">
+            <div className="text-center">
+              <Loader2 className="w-12 h-12 mx-auto mb-2 opacity-40 animate-spin" />
+              <p className="text-sm">Loading preview...</p>
             </div>
           </div>
+        ) : (
+          <div className="flex items-center justify-center h-full text-[#062e69]/60">
+            <div className="text-center">
+              <FileText className="w-12 h-12 mx-auto mb-2 opacity-40" />
+              <p className="text-sm">
+                {translationJobs.length > 0
+                  ? "Select a completed file to preview"
+                  : "No files available for preview"}
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Download Button Footer */}
+      <div className="p-1 border-t border-[#062e69]/10">
+        <div className="fixed bottom-14 right-5 z-50 flex items-center gap-3">
+          {hoveredItem && (
+            <div className="p-2 w-64 bg-gray-900 text-white rounded-lg shadow-2xl animate-fadeIn mt-[30%]">
+              {/* <p className="text-xs leading-relaxed"> */}
+                {/* {
+                  legendData.find((item) => item.id === hoveredItem)
+                    ?.description
+                } */}
+              {/* </p> */}
+            </div>
+          )}
+          {/* <div className="bg-white rounded-xl shadow-2xl p-2 max-w-xs border border-gray-200">
+            <div
+              className="flex justify-between items-center cursor-pointer"
+              onClick={() => setIsExpanded(!isExpanded)}
+            >
+              <h3 className="text-sm font-bold text-gray-800 mb-0 pb-0 pr-2">
+                Delta Legend
+              </h3>
+              <button className="text-gray-500 hover:text-gray-700 focus:outline-none pb-1">
+                {isExpanded ? '−' : '+'}
+              </button>
+            </div>
+            {isExpanded && (
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {legendData.map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex items-center gap-2 p-0 transition-all duration-200 cursor-pointer"
+                    onMouseEnter={() => setHoveredItem(item.id)}
+                    onMouseLeave={() => setHoveredItem(null)}
+                  >
+                    <div
+                      className="w-4 h-4 rounded shadow-sm flex-shrink-0 transition-transform duration-200 hover:scale-110"
+                      style={{ backgroundColor: item.color }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium text-gray-700 hover:text-black truncate">
+                        {item.label}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div> */}
         </div>
-      )}
+        <center>
+          <button
+            onClick={() =>
+              selectedJobForPreview &&
+              handleDownload(selectedJobForPreview)
+            }
+            disabled={
+              !selectedJobForPreview ||
+              !jobStatuses[selectedJobForPreview]?.download_id
+            }
+            className="w-full bg-gradient-to-r from-[#062e69] to-[#062e69]/80 hover:from-[#062e69]/90 hover:to-[#062e69] text-white px-4 py-3 rounded-xl font-medium transition-all duration-200 transform hover:scale-100 hover:shadow-lg hover:shadow-[#062e69]/25 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+          >
+            <Download className="w-4 h-4" />
+            <span>
+              {selectedJobForPreview
+                ? `Download ${
+                    translationJobs.find(
+                      (j) => j.job_id === selectedJobForPreview
+                    )?.filename || "File"
+                  }`
+                : "Select file to download"}
+            </span>
+          </button>
+        </center>
+      </div>
+    </div>
+  </div>
+)}
+
+{/* Delta Quality Report Modal */}
+{showDeltaModal && selectedDeltaData && (
+  <div className="fixed right-0 top-0 h-full w-[35vw] p-2 bg-white/5 backdrop-blur-sm border-l border-white/10 overflow-y-auto z-50">
+    <div className="h-full bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+
+      {/* Header */}
+      <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-2 flex items-center justify-between">
+        <div className="flex items-center space-x-3">
+          <Shield className="w-6 h-6 ml-2" />
+          <h2 className="text-xl font-bold">Delta Reasoning Report</h2>
+        </div>
+        <button
+          onClick={closeDeltaModal}
+          className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+        >
+          <X className="w-6 h-6" />
+        </button>
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto">
+        <pre className="whitespace-pre-wrap font-mono text-sm bg-white p-4 leading-relaxed overflow-x-auto">
+          {selectedDeltaData.raw}
+        </pre>
+      </div>
+
+      {/* Footer */}
+      <div className="bg-gray-50 p-4 border-t border-gray-200 flex justify-end space-x-3">
+        <button
+          onClick={closeDeltaModal}
+          className="px-6 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg font-medium transition-colors"
+        >
+          Close
+        </button>
+
+        <button
+          onClick={() => {
+            const blob = new Blob([selectedDeltaData.raw], { type: "text/plain" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = selectedDeltaData.filename || "delta_reasoning_report.txt";
+            a.click();
+            URL.revokeObjectURL(url);
+          }}
+          className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors flex items-center space-x-2"
+        >
+          <Download className="w-4 h-4" />
+          <span>Download TXT Report</span>
+        </button>
+      </div>
+
+    </div>
+  </div>
+)}
     </div>
   );
 };

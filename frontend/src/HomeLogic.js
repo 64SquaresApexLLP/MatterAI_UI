@@ -523,14 +523,14 @@ export const languages = [
   "Chinese (Mandarin)",
   "German",
   "French",
-  "Spanish",
-  "Italian",
-  "Swedish",
-  "Danish",
-  "Dutch",
-  "Finnish",
-  "Korean",
-  "Japanese",
+  // "Spanish",
+  // "Italian",
+  // "Swedish",
+  // "Danish",
+  // "Dutch",
+  // "Finnish",
+  // "Korean",
+  // "Japanese",
   "English",
 ];
 
@@ -572,6 +572,10 @@ export const useHomeLogic = () => {
   const [selectedTargetFileType, setSelectedTargetFileType] = useState(null);
   const [showFileTypeDropdown, setShowFileTypeDropdown] = useState(false);
   const [isExpanded, setIsExpanded] = useState(true);
+
+  const [showDeltaModal, setShowDeltaModal] = useState(false);
+  const [selectedDeltaData, setSelectedDeltaData] = useState(null);
+  const [loadingDelta, setLoadingDelta] = useState(false);
 
   useEffect(() => {
     const randomPercentage = Math.floor(Math.random() * (90 - 80 + 1)) + 80;
@@ -1707,6 +1711,75 @@ export const useHomeLogic = () => {
   }
 };
 
+const fetchDeltaData = async (deltaId, jobId) => {
+  if (!deltaId) {
+    console.error('No delta_id provided');
+    return;
+  }
+
+  setLoadingDelta(true);
+  const loadingToast = toast ? toast.loading("Loading Delta report...") : null;
+
+  try {
+    console.log(`Fetching delta data for delta_id: ${deltaId}`);
+
+    const response = await fetch(`${TRANSLATION_API_BASE_URL}/delta/${deltaId}`, {
+      method: 'GET',
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(errorText || `HTTP ${response.status}`);
+    }
+
+    const rawText = await response.text();   // ✔️ correct
+    console.log("Delta TXT received:", rawText);
+
+    setSelectedDeltaData({
+      raw: rawText,
+    });
+    setShowDeltaModal(true);
+
+    toast?.update(loadingToast, {
+      render: "Delta reasoning loaded!",
+      type: "success",
+      isLoading: false,
+      autoClose: 2000,
+    });
+
+    return rawText;
+
+  } catch (error) {
+    console.error("Delta fetch error:", error);
+
+    toast?.update(loadingToast, {
+      render: `Delta load failed: ${error.message}`,
+      type: "error",
+      isLoading: false,
+      autoClose: 5000,
+    });
+  } finally {
+    setLoadingDelta(false);
+  }
+};
+
+const handleViewDelta = (jobId) => {
+  const jobStatus = jobStatuses[jobId];
+  
+  if (!jobStatus?.delta_id) {
+    const message = "No quality report available for this translation.";
+    toast ? toast.warning(message) : alert(message);
+    return;
+  }
+
+  fetchDeltaData(jobStatus.delta_id, jobId);
+};
+
+const closeDeltaModal = () => {
+  setShowDeltaModal(false);
+  setSelectedDeltaData(null);
+};
+
   return {
     percentage,
     query,
@@ -1764,6 +1837,12 @@ export const useHomeLogic = () => {
     setShowFileTypeDropdown,
     handleFileConversion,
     isExpanded,
-    setIsExpanded
+    setIsExpanded,
+    showDeltaModal,
+    selectedDeltaData,
+    loadingDelta,
+    handleViewDelta,
+    closeDeltaModal,
+    fetchDeltaData,
   };
 };
