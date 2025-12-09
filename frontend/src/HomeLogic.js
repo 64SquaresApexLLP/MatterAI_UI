@@ -2,6 +2,8 @@ import { useState, useRef, useEffect } from "react";
 import { toast } from "react-toastify";
 import { queryAPI } from "./api/apiService.js";
 
+// import UseStates from "./UseStates.jsx";
+
 const TRANSLATION_API_BASE_URL = import.meta.env.VITE_TRANSLATION_API_URL;
 
 export const detectCJKLanguage = (filename, targetLanguage) => {
@@ -928,40 +930,40 @@ export const useHomeLogic = () => {
           uploadedFiles,
           targetLanguage,
           query.trim()
-        ); 
+        );
       } else {
-                // --- URGENT FIX: Ensure Target Language is explicitly sent to the API ---
-                
-                // 1. Determine the Single Target Language
-                let targetLanguage = selectedLanguage;
-                if (!targetLanguage && extractedLanguages.length === 1) {
-                  targetLanguage = extractedLanguages[0];
-                }
+        // --- URGENT FIX: Ensure Target Language is explicitly sent to the API ---
 
-                if (targetLanguage) {
-                  // Get the backend-safe language name (e.g., "German" -> "german")
-                  const backendLanguage = LANGUAGE_MAPPING[targetLanguage] || targetLanguage.toLowerCase();
-                  
-                  console.log('=== Standard Translation Request - FORCING TARGET LANGUAGE ===');
-                  console.log('Target Language:', backendLanguage);
-                  console.log('Number of files:', uploadedFiles.length);
+        // 1. Determine the Single Target Language
+        let targetLanguage = selectedLanguage;
+        if (!targetLanguage && extractedLanguages.length === 1) {
+          targetLanguage = extractedLanguages[0];
+        }
 
-                  // 2. Use a robust API call that sends the explicit target_language parameter
-                  // NOTE: This assumes you use the translateMultipleFilesToSingleLanguage API (which already exists in your code)
-                  result = await translationAPI.translateMultipleFilesToSingleLanguage(
-                    uploadedFiles,
-                    backendLanguage, // Passes 'german' or 'french' as the explicit target_language
-                    query.trim() // Passes the original prompt
-                  );
+        if (targetLanguage) {
+          // Get the backend-safe language name (e.g., "German" -> "german")
+          const backendLanguage = LANGUAGE_MAPPING[targetLanguage] || targetLanguage.toLowerCase();
 
-                } else {
-                  // 3. Fallback: Use conversational prompt only if NO clear target language was found
-                  console.log('=== Standard Translation Request - CONVERSATIONAL FALLBACK (No clear language) ===');
-                  console.log('Translation prompt:', query.trim());
-                  
-                  result = await translationAPI.translateFileConvoWithPrompt(uploadedFiles, query.trim());
-                }
-              }
+          console.log('=== Standard Translation Request - FORCING TARGET LANGUAGE ===');
+          console.log('Target Language:', backendLanguage);
+          console.log('Number of files:', uploadedFiles.length);
+
+          // 2. Use a robust API call that sends the explicit target_language parameter
+          // NOTE: This assumes you use the translateMultipleFilesToSingleLanguage API (which already exists in your code)
+          result = await translationAPI.translateMultipleFilesToSingleLanguage(
+            uploadedFiles,
+            backendLanguage, // Passes 'german' or 'french' as the explicit target_language
+            query.trim() // Passes the original prompt
+          );
+
+        } else {
+          // 3. Fallback: Use conversational prompt only if NO clear target language was found
+          console.log('=== Standard Translation Request - CONVERSATIONAL FALLBACK (No clear language) ===');
+          console.log('Translation prompt:', query.trim());
+
+          result = await translationAPI.translateFileConvoWithPrompt(uploadedFiles, query.trim());
+        }
+      }
 
       console.log('=== Translation Response ===');
       console.log('Response:', result.response);
@@ -1280,29 +1282,29 @@ export const useHomeLogic = () => {
     const fileArray = Array.from(files);
 
     if (selectedButton === "File_Converter") {
-    const validFiles = fileArray.filter(file => {
-      const validTypes = ['application/pdf', 'application/msword', 
-                         'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
-      return validTypes.includes(file.type) || file.name.match(/\.(pdf|doc|docx)$/i);
-    });
+      const validFiles = fileArray.filter(file => {
+        const validTypes = ['application/pdf', 'application/msword',
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+        return validTypes.includes(file.type) || file.name.match(/\.(pdf|doc|docx)$/i);
+      });
 
-    if (validFiles.length === 0) {
-      toast.error("Please upload PDF or Word documents only");
+      if (validFiles.length === 0) {
+        toast.error("Please upload PDF or Word documents only");
+        return;
+      }
+
+      const fileObjects = validFiles.map(file => ({
+        id: Date.now() + Math.random(),
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        file: file
+      }));
+
+      setUploadedFiles(fileObjects);
+      toast.success(`${fileObjects.length} file(s) ready for conversion`);
       return;
     }
-
-    const fileObjects = validFiles.map(file => ({
-      id: Date.now() + Math.random(),
-      name: file.name,
-      size: file.size,
-      type: file.type,
-      file: file
-    }));
-
-    setUploadedFiles(fileObjects);
-    toast.success(`${fileObjects.length} file(s) ready for conversion`);
-    return;
-  }
 
     if (selectedButton === "Translation") {
       // For translation mode, ONLY handle files locally - no server upload
@@ -1642,143 +1644,143 @@ export const useHomeLogic = () => {
   };
 
   const isPotentiallyCJK = (filename, targetLanguage = "") => {
-  const cjkLanguages = [ "chinese", "japanese", "korean", "zh", "ja", "ko", "cn", "jp", "kr", "中文", "日本語", "한국어" ];
-  const lowerFilename = filename.toLowerCase();
-  const lowerLanguage = targetLanguage.toLowerCase();
-  return cjkLanguages.some(
-    (lang) =>
-      lowerFilename.includes(lang) ||
-      lowerLanguage.includes(lang) ||
-      containsCJK(filename) ||
-      containsCJK(targetLanguage)
-  );
+    const cjkLanguages = ["chinese", "japanese", "korean", "zh", "ja", "ko", "cn", "jp", "kr", "中文", "日本語", "한국어"];
+    const lowerFilename = filename.toLowerCase();
+    const lowerLanguage = targetLanguage.toLowerCase();
+    return cjkLanguages.some(
+      (lang) =>
+        lowerFilename.includes(lang) ||
+        lowerLanguage.includes(lang) ||
+        containsCJK(filename) ||
+        containsCJK(targetLanguage)
+    );
   };
 
   const handleFileConversion = async (selectedTargetFileType) => {
-  console.log('=== File Conversion Debug ===');
-  console.log('Uploaded files:', uploadedFiles);
-  console.log('Selected target type (passed as param):', selectedTargetFileType);
-  
-  if (!uploadedFiles.length) {
-    alert("Please upload a file first.");
-    return;
-  }
-  
-  if (!selectedTargetFileType) {
-    alert("Please select a target format (PDF or DOCX).");
-    return;
-  }
+    console.log('=== File Conversion Debug ===');
+    console.log('Uploaded files:', uploadedFiles);
+    console.log('Selected target type (passed as param):', selectedTargetFileType);
 
-  const file = uploadedFiles[0];
-  console.log('Converting file:', file.name, 'to:', selectedTargetFileType);
-
-  const formData = new FormData();
-  formData.append("file", file.file);
-  formData.append("target_format", selectedTargetFileType);
-
-  try {
-    setIsTranslating(true);
-    console.log('Sending conversion request...');
-    
-    const response = await fetch(import.meta.env.VITE_API_BASE_URL + "/convert_file", {
-      method: "POST",
-      body: formData,
-    });
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Conversion failed: ${response.status} - ${errorText}`);
-    }
-    
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.style.display = 'none';
-    a.href = url;
-    a.download = file.name.replace(/\.[^/.]+$/, '') + '.' + selectedTargetFileType;
-    document.body.appendChild(a);
-    a.click();
-    window.URL.revokeObjectURL(url);
-    document.body.removeChild(a);
-    
-    toast.success("File converted successfully!");
-    
-  } catch (err) {
-    console.error('Conversion error:', err);
-    toast.error(`Conversion failed: ${err.message}`);
-  } finally {
-    setIsTranslating(false);
-  }
-};
-
-const fetchDeltaData = async (deltaId, jobId) => {
-  if (!deltaId) {
-    console.error('No delta_id provided');
-    return;
-  }
-
-  setLoadingDelta(true);
-  const loadingToast = toast ? toast.loading("Loading Delta report...") : null;
-
-  try {
-    console.log(`Fetching delta data for delta_id: ${deltaId}`);
-
-    const response = await fetch(`${TRANSLATION_API_BASE_URL}/delta/${deltaId}`, {
-      method: 'GET',
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(errorText || `HTTP ${response.status}`);
+    if (!uploadedFiles.length) {
+      alert("Please upload a file first.");
+      return;
     }
 
-    const rawText = await response.text();   // ✔️ correct
-    console.log("Delta TXT received:", rawText);
+    if (!selectedTargetFileType) {
+      alert("Please select a target format (PDF or DOCX).");
+      return;
+    }
 
-    setSelectedDeltaData({
-      raw: rawText,
-    });
-    setShowDeltaModal(true);
+    const file = uploadedFiles[0];
+    console.log('Converting file:', file.name, 'to:', selectedTargetFileType);
 
-    toast?.update(loadingToast, {
-      render: "Delta reasoning loaded!",
-      type: "success",
-      isLoading: false,
-      autoClose: 2000,
-    });
+    const formData = new FormData();
+    formData.append("file", file.file);
+    formData.append("target_format", selectedTargetFileType);
 
-    return rawText;
+    try {
+      setIsTranslating(true);
+      console.log('Sending conversion request...');
 
-  } catch (error) {
-    console.error("Delta fetch error:", error);
+      const response = await fetch(import.meta.env.VITE_API_BASE_URL + "/convert_file", {
+        method: "POST",
+        body: formData,
+      });
 
-    toast?.update(loadingToast, {
-      render: `Delta load failed: ${error.message}`,
-      type: "error",
-      isLoading: false,
-      autoClose: 5000,
-    });
-  } finally {
-    setLoadingDelta(false);
-  }
-};
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Conversion failed: ${response.status} - ${errorText}`);
+      }
 
-const handleViewDelta = (jobId) => {
-  const jobStatus = jobStatuses[jobId];
-  
-  if (!jobStatus?.delta_id) {
-    const message = "No quality report available for this translation.";
-    toast ? toast.warning(message) : alert(message);
-    return;
-  }
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = file.name.replace(/\.[^/.]+$/, '') + '.' + selectedTargetFileType;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
 
-  fetchDeltaData(jobStatus.delta_id, jobId);
-};
+      toast.success("File converted successfully!");
 
-const closeDeltaModal = () => {
-  setShowDeltaModal(false);
-  setSelectedDeltaData(null);
-};
+    } catch (err) {
+      console.error('Conversion error:', err);
+      toast.error(`Conversion failed: ${err.message}`);
+    } finally {
+      setIsTranslating(false);
+    }
+  };
+
+  const fetchDeltaData = async (deltaId, jobId) => {
+    if (!deltaId) {
+      console.error('No delta_id provided');
+      return;
+    }
+
+    setLoadingDelta(true);
+    const loadingToast = toast ? toast.loading("Loading Delta report...") : null;
+
+    try {
+      console.log(`Fetching delta data for delta_id: ${deltaId}`);
+
+      const response = await fetch(`${TRANSLATION_API_BASE_URL}/delta/${deltaId}`, {
+        method: 'GET',
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || `HTTP ${response.status}`);
+      }
+
+      const rawText = await response.text();   // ✔️ correct
+      console.log("Delta TXT received:", rawText);
+
+      setSelectedDeltaData({
+        raw: rawText,
+      });
+      setShowDeltaModal(true);
+
+      toast?.update(loadingToast, {
+        render: "Delta reasoning loaded!",
+        type: "success",
+        isLoading: false,
+        autoClose: 2000,
+      });
+
+      return rawText;
+
+    } catch (error) {
+      console.error("Delta fetch error:", error);
+
+      toast?.update(loadingToast, {
+        render: `Delta load failed: ${error.message}`,
+        type: "error",
+        isLoading: false,
+        autoClose: 5000,
+      });
+    } finally {
+      setLoadingDelta(false);
+    }
+  };
+
+  const handleViewDelta = (jobId) => {
+    const jobStatus = jobStatuses[jobId];
+
+    if (!jobStatus?.delta_id) {
+      const message = "No quality report available for this translation.";
+      toast ? toast.warning(message) : alert(message);
+      return;
+    }
+
+    fetchDeltaData(jobStatus.delta_id, jobId);
+  };
+
+  const closeDeltaModal = () => {
+    setShowDeltaModal(false);
+    setSelectedDeltaData(null);
+  };
 
   return {
     percentage,

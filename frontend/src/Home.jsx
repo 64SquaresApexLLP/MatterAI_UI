@@ -1,11 +1,16 @@
-import { React, useState, useRef, useEffect, Send, Mic, Paperclip, X, FileText, File, LogOut, User, Languages, Download, Eye, Loader2, CheckCircle, Upload, Bell, BellOff, Clock, AlertCircle, DownloadCloud, TrendingUp, AlertTriangle, Info, Globe, Copy, MessageCircle, FileSymlink, ToastContainer, TimesheetForm, TimesheetEntries, useHomeLogic, notificationHelper, languages, formatFileSize, TimesheetOptions, Document, Page, pdfjs, pdfjsLib, renderAsync, loadNotoCJK, previewCJKPdf, docxPdf, Packer, Paragraph, TextRun, PDFDocument, rgb } from "./Imports.jsx";
+import { React, useState, useRef, useEffect, Send, Mic, Paperclip, X, FileText, File, LogOut, User, Languages, Download, Eye, Loader2, CheckCircle, Upload, Bell, BellOff, Clock, AlertCircle, DownloadCloud, TrendingUp, AlertTriangle, Info, Globe, Copy, MessageCircle, FileSymlink, ToastContainer, TimesheetForm, TimesheetEntries, useHomeLogic, notificationHelper, languages, formatFileSize, TimesheetOptions, Document, Page, pdfjs, pdfjsLib, renderAsync, loadNotoCJK, previewCJKPdf, docxPdf, Packer, Paragraph, TextRun, PDFDocument, rgb, Shield, FileWarning, Type, Zap, Settings } from "./Imports.jsx";
 import { jurisdictions, jurisdictionPrompts, legendData, pdfOptions, fileTypeOptions } from "./StaticData.jsx";
 import UseStates from "./UseStates.jsx";
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
-
-import { Shield, FileWarning, Type, Zap } from 'lucide-react';
+import AdminPanel from "./AdminPanel";
 
 const Home = ({ user, onBack, onLogout }) => {
+  const [showAdminPanel, setShowAdminPanel] = useState(false);
+    const isSuperAdmin =
+    user?.user?.role_name === "SuperAdmin" || user?.role_name === "SuperAdmin";
+  const isOrgAdmin =
+    user?.user?.role_name === "OrgAdmin" || user?.role_name === "OrgAdmin";
+
   const { percentage, query, setQuery, selectedButton, selectedLanguage, showLanguageDropdown, setShowLanguageDropdown, uploadedFiles, setUploadedFiles, isDragOver, isTranslating, translationResult, translationJobs, jobStatuses, evaluationData, previewText, showPreview, setShowPreview, fileInputRef, showTimesheet, setShowTimesheet, showEntries, setShowEntries, isListening, textTranslationResult, setTextTranslationResult, chatResponse, setChatResponse, notificationPermission, handleRequestNotificationPermission, previewFile, previewFileType, toggleListening, handleButtonClick, handleLanguageSelect, handleSubmit, handleFileInputChange, handleDragOver, handleDragLeave, handleDrop, removeFile, handleDownload, handleDownloadAll, fetchEvaluation, refreshEvaluations, extractLanguagesFromPrompt, LANGUAGE_MAPPING, isPotentiallyCJK, handleFileConversion, showDeltaModal, selectedDeltaData, loadingDelta, handleViewDelta, closeDeltaModal, fetchDeltaData } = useHomeLogic();
   const { numPages, setNumPages, pageNumber, setPageNumber, selectedJobForPreview, setSelectedJobForPreview, previewingFile, setPreviewingFile, showEvaluationDetails, setShowEvaluationDetails, previewUrl, setPreviewUrl, currentPreviewFileType, setCurrentPreviewFileType, useCJKMode, setUseCJKMode, showJurisdictionDropdown, setShowJurisdictionDropdown, docxPreviewRef, selectedJurisdiction, setSelectedJurisdiction, showPromptSection, setShowPromptSection, showOptionsSection, setShowOptionsSection, showFileSelector, setShowFileSelector, convertingToPdf, setConvertingToPdf, hoveredItem, setHoveredItem, selectedTargetFileType, setSelectedTargetFileType, showFileTypeDropdown, setShowFileTypeDropdown, isExpanded, setIsExpanded } = UseStates();
 
@@ -473,6 +478,16 @@ const getAccuracyColor = (accuracy) => {
             <User className="w-4 h-4" />
             <span className="text-sm font-medium">Welcome user</span>
           </div>
+           {(isSuperAdmin || isOrgAdmin) && (
+              <button
+                onClick={() => setShowAdminPanel(true)}
+                className="flex items-center space-x-1 text-[#062e69]/70 hover:text-[#062e69] transition-colors duration-200 text-sm font-medium"
+                title="Admin Panel"
+              >
+                <Settings className="w-4 h-4" />
+                <span>Admin</span>
+              </button>
+            )}
           <button
             onClick={onLogout}
             className="flex items-center space-x-1 text-[#062e69]/70 hover:text-[#062e69] transition-colors duration-200 text-sm font-medium"
@@ -483,6 +498,12 @@ const getAccuracyColor = (accuracy) => {
           </button>
         </div>
       </div>
+      {showAdminPanel && (
+          <AdminPanel
+            currentUser={user?.user || user}
+            onClose={() => setShowAdminPanel(false)}
+          />
+        )}
       <div
       className={`
         // ${showPreview || showDeltaModal ? "w-[30vw]" : "w-full"}

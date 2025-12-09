@@ -14,7 +14,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
-import { timesheetAPI } from "./api/apiService.js";
+import { timesheetAPI } from "../api/apiService.js";
 
 const TimesheetEntries = ({ onClose }) => {
   const [entries, setEntries] = useState([]);

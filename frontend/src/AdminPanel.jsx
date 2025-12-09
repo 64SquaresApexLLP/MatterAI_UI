@@ -13,6 +13,39 @@ import { adminAPI, authAPI } from "./api/apiService";
 import UsersTable from "./UsersTable";
 
 const AdminPanel = ({ currentUser, onClose }) => {
+  const [crudType, setCrudType] = useState("users");
+
+  const dummyData = {
+    users: [
+      { id: 1, username: "john", email: "john@example.com", role: "User" },
+      { id: 2, username: "alex", email: "alex@example.com", role: "User" },
+    ],
+    orgAdmins: [
+      {
+        id: 10,
+        username: "orgadmin1",
+        email: "oa1@example.com",
+        role: "OrgAdmin",
+      },
+      {
+        id: 11,
+        username: "orgadmin2",
+        email: "oa2@example.com",
+        role: "OrgAdmin",
+      },
+    ],
+  };
+
+  const handleEdit = (item) => {
+    console.log("Edit clicked:", item);
+    showMessage(`Edit clicked for ${item.username}`, "success");
+  };
+
+  const handleDelete = (id) => {
+    console.log("Delete clicked:", id);
+    showMessage(`Delete clicked for ID ${id}`, "error");
+  };
+
   const [activeTab, setActiveTab] = useState(null); // "createUser" | "createOrg" | "createOrgAdmin"
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
