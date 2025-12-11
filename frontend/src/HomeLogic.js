@@ -1725,7 +1725,7 @@ export const useHomeLogic = () => {
     try {
       console.log(`Fetching delta data for delta_id: ${deltaId}`);
 
-      const response = await fetch(`${TRANSLATION_API_BASE_URL}/delta/${deltaId}`, {
+      const response = await fetch(`${TRANSLATION_API_BASE_URL}/delta/${deltaId}/with-translations`, {
         method: 'GET',
       });
 
