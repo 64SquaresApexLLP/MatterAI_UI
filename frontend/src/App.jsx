@@ -8,7 +8,6 @@ const App = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState(null);
 
-  // 🔹 Check localStorage when the app first loads
   useEffect(() => {
     const token = localStorage.getItem("authToken");
     const storedUser = localStorage.getItem("user");
@@ -24,7 +23,7 @@ const App = () => {
   const handleLoginSuccess = (userData) => {
     setIsAuthenticated(true);
     setUser(userData);
-    localStorage.setItem("authToken", userData.token); // or your actual token field
+    localStorage.setItem("authToken", userData.token);
     localStorage.setItem("user", JSON.stringify(userData));
   };
 

@@ -20,6 +20,7 @@ const UseStates = () => {
   const [selectedTargetFileType, setSelectedTargetFileType] = useState(null);
   const [showFileTypeDropdown, setShowFileTypeDropdown] = useState(false);
   const [isExpanded, setIsExpanded] = useState(true);
+  const [showAdminPanel, setShowAdminPanel] = useState(false);
 
   return {
     numPages,
@@ -58,7 +59,9 @@ const UseStates = () => {
     showFileTypeDropdown,
     setShowFileTypeDropdown,
     isExpanded,
-    setIsExpanded
+    setIsExpanded,
+    showAdminPanel, 
+    setShowAdminPanel
   };
 };
 

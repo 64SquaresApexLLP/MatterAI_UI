@@ -1,18 +1,20 @@
-import { React, useState, useRef, useEffect, Send, Mic, Paperclip, X, FileText, File, LogOut, User, Languages, Download, Eye, Loader2, CheckCircle, Upload, Bell, BellOff, Clock, AlertCircle, DownloadCloud, TrendingUp, AlertTriangle, Info, Globe, Copy, MessageCircle, FileSymlink, ToastContainer, TimesheetForm, TimesheetEntries, useHomeLogic, notificationHelper, languages, formatFileSize, TimesheetOptions, Document, Page, pdfjs, pdfjsLib, renderAsync, loadNotoCJK, previewCJKPdf, docxPdf, Packer, Paragraph, TextRun, PDFDocument, rgb, Shield, FileWarning, Type, Zap, Settings } from "./Imports.jsx";
+import { React, useNavigate, useState, useRef, useEffect, Send, Mic, Paperclip, X, FileText, File, LogOut, User, Languages, Download, Eye, Loader2, CheckCircle, Upload, Bell, BellOff, Clock, AlertCircle, DownloadCloud, TrendingUp, AlertTriangle, Info, Globe, Copy, MessageCircle, FileSymlink, ToastContainer, TimesheetForm, TimesheetEntries, useHomeLogic, notificationHelper, languages, formatFileSize, TimesheetOptions, Document, Page, pdfjs, pdfjsLib, renderAsync, loadNotoCJK, previewCJKPdf, docxPdf, Packer, Paragraph, TextRun, PDFDocument, rgb, Shield, FileWarning, Type, Zap, Settings } from "./Imports.jsx";
 import { jurisdictions, jurisdictionPrompts, legendData, pdfOptions, fileTypeOptions } from "./StaticData.jsx";
 import UseStates from "./UseStates.jsx";
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
-import AdminPanel from "./AdminPanel";
+import AdminPanel from "./Profile.jsx";
 
 const Home = ({ user, onBack, onLogout }) => {
-  const [showAdminPanel, setShowAdminPanel] = useState(false);
-    const isSuperAdmin =
+  const { percentage, query, setQuery, selectedButton, selectedLanguage, showLanguageDropdown, setShowLanguageDropdown, uploadedFiles, setUploadedFiles, isDragOver, isTranslating, translationResult, translationJobs, jobStatuses, evaluationData, previewText, showPreview, setShowPreview, fileInputRef, showTimesheet, setShowTimesheet, showEntries, setShowEntries, isListening, textTranslationResult, setTextTranslationResult, chatResponse, setChatResponse, notificationPermission, handleRequestNotificationPermission, previewFile, previewFileType, toggleListening, handleButtonClick, handleLanguageSelect, handleSubmit, handleFileInputChange, handleDragOver, handleDragLeave, handleDrop, removeFile, handleDownload, handleDownloadAll, fetchEvaluation, refreshEvaluations, extractLanguagesFromPrompt, LANGUAGE_MAPPING, isPotentiallyCJK, handleFileConversion, showDeltaModal, selectedDeltaData, loadingDelta, handleViewDelta, closeDeltaModal, fetchDeltaData } = useHomeLogic();
+  const { numPages, setNumPages, pageNumber, setPageNumber, selectedJobForPreview, setSelectedJobForPreview, previewingFile, setPreviewingFile, showEvaluationDetails, setShowEvaluationDetails, previewUrl, setPreviewUrl, currentPreviewFileType, setCurrentPreviewFileType, useCJKMode, setUseCJKMode, showJurisdictionDropdown, setShowJurisdictionDropdown, docxPreviewRef, selectedJurisdiction, setSelectedJurisdiction, showPromptSection, setShowPromptSection, showOptionsSection, setShowOptionsSection, showFileSelector, setShowFileSelector, convertingToPdf, setConvertingToPdf, hoveredItem, setHoveredItem, selectedTargetFileType, setSelectedTargetFileType, showFileTypeDropdown, setShowFileTypeDropdown, isExpanded, setIsExpanded } = UseStates();
+  const navigate = useNavigate();
+
+  const isSuperAdmin =
     user?.user?.role_name === "SuperAdmin" || user?.role_name === "SuperAdmin";
   const isOrgAdmin =
     user?.user?.role_name === "OrgAdmin" || user?.role_name === "OrgAdmin";
-
-  const { percentage, query, setQuery, selectedButton, selectedLanguage, showLanguageDropdown, setShowLanguageDropdown, uploadedFiles, setUploadedFiles, isDragOver, isTranslating, translationResult, translationJobs, jobStatuses, evaluationData, previewText, showPreview, setShowPreview, fileInputRef, showTimesheet, setShowTimesheet, showEntries, setShowEntries, isListening, textTranslationResult, setTextTranslationResult, chatResponse, setChatResponse, notificationPermission, handleRequestNotificationPermission, previewFile, previewFileType, toggleListening, handleButtonClick, handleLanguageSelect, handleSubmit, handleFileInputChange, handleDragOver, handleDragLeave, handleDrop, removeFile, handleDownload, handleDownloadAll, fetchEvaluation, refreshEvaluations, extractLanguagesFromPrompt, LANGUAGE_MAPPING, isPotentiallyCJK, handleFileConversion, showDeltaModal, selectedDeltaData, loadingDelta, handleViewDelta, closeDeltaModal, fetchDeltaData } = useHomeLogic();
-  const { numPages, setNumPages, pageNumber, setPageNumber, selectedJobForPreview, setSelectedJobForPreview, previewingFile, setPreviewingFile, showEvaluationDetails, setShowEvaluationDetails, previewUrl, setPreviewUrl, currentPreviewFileType, setCurrentPreviewFileType, useCJKMode, setUseCJKMode, showJurisdictionDropdown, setShowJurisdictionDropdown, docxPreviewRef, selectedJurisdiction, setSelectedJurisdiction, showPromptSection, setShowPromptSection, showOptionsSection, setShowOptionsSection, showFileSelector, setShowFileSelector, convertingToPdf, setConvertingToPdf, hoveredItem, setHoveredItem, selectedTargetFileType, setSelectedTargetFileType, showFileTypeDropdown, setShowFileTypeDropdown, isExpanded, setIsExpanded } = UseStates();
+  const isUser = 
+    user?.user?.role_name === "User" || user?.role_name === "User";
 
   useEffect(() => {
     setShowFileSelector(translationJobs.length > 0);
@@ -476,16 +478,26 @@ const getAccuracyColor = (accuracy) => {
         <div className="flex items-center space-x-4 bg-white/90 backdrop-blur-xl border border-[#062e69]/30 rounded-xl px-4 py-2 shadow-lg">
           <div className="flex items-center space-x-2 text-[#062e69]">
             <User className="w-4 h-4" />
-            <span className="text-sm font-medium">Welcome user</span>
+            <span>{isSuperAdmin ? "Welcome SuperAdmin" : isOrgAdmin ? "Welcome OrgAdmin" : isUser ? "Welcome User" : "Welcome"}</span>
           </div>
-           {(isSuperAdmin || isOrgAdmin) && (
+           {(isUser) && (
               <button
-                onClick={() => setShowAdminPanel(true)}
+                onClick={() =>navigate("/profile")}
                 className="flex items-center space-x-1 text-[#062e69]/70 hover:text-[#062e69] transition-colors duration-200 text-sm font-medium"
                 title="Admin Panel"
               >
                 <Settings className="w-4 h-4" />
-                <span>Admin</span>
+                <span>Edit Profile</span>
+              </button>
+            )}
+            {(isSuperAdmin || isOrgAdmin) && (
+              <button
+                onClick={() => navigate("/profile")}
+                className="flex items-center space-x-1 text-[#062e69]/70 hover:text-[#062e69] transition-colors duration-200 text-sm font-medium"
+                title="Admin Panel"
+              >
+                <Settings className="w-4 h-4" />
+                <span>Edit Profile & User Mgt</span>
               </button>
             )}
           <button
@@ -498,12 +510,6 @@ const getAccuracyColor = (accuracy) => {
           </button>
         </div>
       </div>
-      {showAdminPanel && (
-          <AdminPanel
-            currentUser={user?.user || user}
-            onClose={() => setShowAdminPanel(false)}
-          />
-        )}
       <div
       className={`
         // ${showPreview || showDeltaModal ? "w-[30vw]" : "w-full"}

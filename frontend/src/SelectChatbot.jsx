@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 
 import Home from "./Home";
 import OntologicsChat from "./OntologicsChat";
-import AdminPanel from "./AdminPanel";
+import AdminPanel from "./Profile";
 
 const SelectChatbot = ({ user, onLogout }) => {
   const navigate = useNavigate();
@@ -14,11 +14,6 @@ const SelectChatbot = ({ user, onLogout }) => {
   const handleBotSelect = (botType) => {
     setSelectedBot(botType);
   };
-
-  const isSuperAdmin =
-    user?.user?.role_name === "SuperAdmin" || user?.role_name === "SuperAdmin";
-  const isOrgAdmin =
-    user?.user?.role_name === "OrgAdmin" || user?.role_name === "OrgAdmin";
 
   if (selectedBot === "ontologics") {
     return (
@@ -40,6 +35,13 @@ const SelectChatbot = ({ user, onLogout }) => {
     );
   }
 
+  const isSuperAdmin =
+    user?.user?.role_name === "SuperAdmin" || user?.role_name === "SuperAdmin";
+  const isOrgAdmin =
+    user?.user?.role_name === "OrgAdmin" || user?.role_name === "OrgAdmin";
+  const isUser = 
+    user?.user?.role_name === "User" || user?.role_name === "User";
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-orange-600 flex items-center justify-center p-4">
       <div className="w-full max-w-4xl">
@@ -47,19 +49,27 @@ const SelectChatbot = ({ user, onLogout }) => {
           <div className="flex items-center space-x-4 bg-white/90 backdrop-blur-xl border border-[#062e69]/30 rounded-xl px-4 py-2 shadow-lg">
             <div className="flex items-center space-x-2 text-[#062e69]">
               <User className="w-4 h-4" />
-              <span className="text-sm font-medium">
-                Welcome user
-                {/* {user?.name || "User"} */}
-              </span>
+              <span>{isSuperAdmin ? "Welcome SuperAdmin" : isOrgAdmin ? "Welcome OrgAdmin" : isUser ? "Welcome User" : "Welcome"}</span>
             </div>
-            {(isSuperAdmin || isOrgAdmin) && (
+            {(isUser) && (
               <button
-                onClick={() => setShowAdminPanel(true)}
+                onClick={() => navigate("/profile")}
                 className="flex items-center space-x-1 text-[#062e69]/70 hover:text-[#062e69] transition-colors duration-200 text-sm font-medium"
                 title="Admin Panel"
               >
                 <Settings className="w-4 h-4" />
-                <span>Admin</span>
+                <span>Edit Profile</span>
+              </button>
+            )}
+
+            {(isSuperAdmin || isOrgAdmin) && (
+              <button
+                onClick={() => navigate("/profile")}
+                className="flex items-center space-x-1 text-[#062e69]/70 hover:text-[#062e69] transition-colors duration-200 text-sm font-medium"
+                title="Admin Panel"
+              >
+                <Settings className="w-4 h-4" />
+                <span>Edit Profile & User Mgt</span>
               </button>
             )}
             <button
