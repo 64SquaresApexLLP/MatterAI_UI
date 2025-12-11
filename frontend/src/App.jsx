@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from "react";
 import Login from "./Login";
 import SelectChatbot from "./SelectChatbot";
+import Profile from "./Profile";
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { Routes, Route, useNavigate } from "react-router-dom";
 
 const App = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const token = localStorage.getItem("authToken");
@@ -32,29 +35,48 @@ const App = () => {
     setUser(null);
     localStorage.removeItem("authToken");
     localStorage.removeItem("user");
+    navigate("/");
   };
 
   return (
-    <div className="App">
-      {isAuthenticated ? (
-        <>
-          <SelectChatbot user={user} onLogout={handleLogout} />
-          <ToastContainer
-            position="top-right"
-            autoClose={5000}
-            hideProgressBar={false}
-            newestOnTop={false}
-            closeOnClick
-            rtl={false}
-            pauseOnFocusLoss
-            draggable
-            pauseOnHover
-          />
-        </>
-      ) : (
-        <Login onLoginSuccess={handleLoginSuccess} />
-      )}
-    </div>
+    <>
+      <Routes>
+        {/* LOGIN PAGE */}
+        <Route
+          path="/"
+          element={
+            isAuthenticated ? (
+              <SelectChatbot user={user} onLogout={handleLogout} />
+            ) : (
+              <Login onLoginSuccess={handleLoginSuccess} />
+            )
+          }
+        />
+
+        {/* PROFILE PAGE */}
+        <Route
+          path="/profile"
+          element={
+            <Profile
+              currentUser={user?.user || user}
+              onClose={() => navigate(-1)}
+            />
+          }
+        />
+      </Routes>
+
+      <ToastContainer
+        position="top-right"
+        autoClose={5000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+      />
+    </>
   );
 };
 

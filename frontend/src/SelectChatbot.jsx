@@ -3,7 +3,6 @@ import { LogOut, User, Settings } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import Home from "./Home";
-import OntologicsChat from "./OntologicsChat";
 import AdminPanel from "./Profile";
 
 const SelectChatbot = ({ user, onLogout }) => {
@@ -14,16 +13,6 @@ const SelectChatbot = ({ user, onLogout }) => {
   const handleBotSelect = (botType) => {
     setSelectedBot(botType);
   };
-
-  if (selectedBot === "ontologics") {
-    return (
-      <OntologicsChat
-        user={user}
-        onBack={() => setSelectedBot(null)}
-        onLogout={onLogout}
-      />
-    );
-  }
 
   if (selectedBot === "matterhorn") {
     return (
@@ -99,10 +88,11 @@ const SelectChatbot = ({ user, onLogout }) => {
         <div className="grid md:grid-cols-2 gap-8">
           {/* Ontologics Bot Card */}
           <button
-            onClick={() => handleBotSelect("ontologics")}
             className="group block w-full text-left"
           >
-            <div className="bg-blue-800/40 backdrop-blur-sm rounded-2xl p-8 border border-blue-700/50 hover:bg-blue-700/50 transition-all duration-300 transform hover:scale-105 hover:shadow-2xl">
+            <div 
+            onClick={() => window.open("http://ontologics-frontend-dev-bucket.s3-website.us-east-2.amazonaws.com/", "")}
+            className="bg-blue-800/40 backdrop-blur-sm rounded-2xl p-8 border border-blue-700/50 hover:bg-blue-700/50 transition-all duration-300 transform hover:scale-105 hover:shadow-2xl">
               <div className="text-center">
                 {/* Ontologics Logo */}
                 <div className="mb-6 flex justify-center">
@@ -125,7 +115,6 @@ const SelectChatbot = ({ user, onLogout }) => {
                 </p>
 
                 <div
-                  onClick={() => window.open("https://ontoai.vercel.app", "")}
                   className="bg-orange-400 text-blue-900 px-6 py-3 rounded-full font-semibold group-hover:bg-orange-300 transition-colors duration-300 inline-block"
                 >
                   Start Chat

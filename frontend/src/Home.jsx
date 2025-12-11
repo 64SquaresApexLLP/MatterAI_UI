@@ -2,7 +2,7 @@ import { React, useNavigate, useState, useRef, useEffect, Send, Mic, Paperclip, 
 import { jurisdictions, jurisdictionPrompts, legendData, pdfOptions, fileTypeOptions } from "./StaticData.jsx";
 import UseStates from "./UseStates.jsx";
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
-import AdminPanel from "./Profile.jsx";
+// import AdminPanel from "./Profile.jsx";
 
 const Home = ({ user, onBack, onLogout }) => {
   const { percentage, query, setQuery, selectedButton, selectedLanguage, showLanguageDropdown, setShowLanguageDropdown, uploadedFiles, setUploadedFiles, isDragOver, isTranslating, translationResult, translationJobs, jobStatuses, evaluationData, previewText, showPreview, setShowPreview, fileInputRef, showTimesheet, setShowTimesheet, showEntries, setShowEntries, isListening, textTranslationResult, setTextTranslationResult, chatResponse, setChatResponse, notificationPermission, handleRequestNotificationPermission, previewFile, previewFileType, toggleListening, handleButtonClick, handleLanguageSelect, handleSubmit, handleFileInputChange, handleDragOver, handleDragLeave, handleDrop, removeFile, handleDownload, handleDownloadAll, fetchEvaluation, refreshEvaluations, extractLanguagesFromPrompt, LANGUAGE_MAPPING, isPotentiallyCJK, handleFileConversion, showDeltaModal, selectedDeltaData, loadingDelta, handleViewDelta, closeDeltaModal, fetchDeltaData } = useHomeLogic();
