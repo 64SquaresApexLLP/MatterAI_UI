@@ -579,6 +579,9 @@ export const useHomeLogic = () => {
   const [selectedDeltaData, setSelectedDeltaData] = useState(null);
   const [loadingDelta, setLoadingDelta] = useState(false);
 
+  const [correctedFileId, setCorrectedFileId] = useState(null);
+
+
   useEffect(() => {
     const randomPercentage = Math.floor(Math.random() * (90 - 80 + 1)) + 80;
     setPercentage(randomPercentage);
@@ -1590,6 +1593,72 @@ export const useHomeLogic = () => {
     }
   };
 
+  const handleCorrectedFileDownload = async () => {
+  if (!correctedFileId) {
+    toast?.error("No corrected file available for download");
+    return;
+  }
+
+  const downloadToast = toast ? toast.loading("Downloading corrected file...") : null;
+
+  try {
+    const response = await translationAPI.download(correctedFileId);
+    const blob = await response.blob();
+
+    const contentDisposition = response.headers.get('content-disposition');
+    let filename = 'corrected_file';
+
+    if (contentDisposition?.includes('filename=')) {
+      filename = contentDisposition
+        .split('filename=')[1]
+        .split(';')[0]
+        .replace(/"/g, '');
+    }
+
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+
+    toast?.update(downloadToast, {
+      render: "Corrected file downloaded",
+      type: "success",
+      isLoading: false,
+      autoClose: 3000,
+    });
+
+  } catch (error) {
+    toast?.update(downloadToast, {
+      render: `Download failed: ${error.message}`,
+      type: "error",
+      isLoading: false,
+      autoClose: 5000,
+    });
+  }
+};
+
+const handleCorrectedFilePreview = async () => {
+  if (!correctedFileId) {
+    toast?.error("No corrected file available for preview");
+    return;
+  }
+
+  try {
+    const previewData = await translationAPI.preview(correctedFileId);
+
+    setPreviewContent(previewData); // whatever state you already use
+    setShowPreview(true);
+
+  } catch (error) {
+    toast?.error(`Preview failed: ${error.message}`);
+  }
+};
+
   const handleDirectDownload = async (jobId) => {
     await handleDownload(jobId, true);
   };
@@ -1713,57 +1782,83 @@ export const useHomeLogic = () => {
     }
   };
 
-  const fetchDeltaData = async (deltaId, jobId) => {
-    if (!deltaId) {
-      console.error('No delta_id provided');
-      return;
+  
+const fetchDeltaData = async (deltaId, jobId) => {
+  if (!deltaId) {
+    console.error("No delta_id provided");
+    return;
+  }
+
+  setLoadingDelta(true);
+  const loadingToast = toast ? toast.loading("Loading Delta report...") : null;
+
+  try {
+    // Step 1: Fetch metadata (new_delta_id + corrected_file_id)
+    const metaResponse = await fetch(
+      `${TRANSLATION_API_BASE_URL}/delta/${deltaId}/with-translations`,
+      { method: "GET" }
+    );
+
+    if (!metaResponse.ok) {
+      const errorText = await metaResponse.text();
+      throw new Error(errorText || `HTTP ${metaResponse.status}`);
     }
 
-    setLoadingDelta(true);
-    const loadingToast = toast ? toast.loading("Loading Delta report...") : null;
+    const {
+      new_delta_id,
+      corrected_file_id
+    } = await metaResponse.json();
 
-    try {
-      console.log(`Fetching delta data for delta_id: ${deltaId}`);
-
-      const response = await fetch(`${TRANSLATION_API_BASE_URL}/delta/${deltaId}/with-translations`, {
-        method: 'GET',
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || `HTTP ${response.status}`);
-      }
-
-      const rawText = await response.text();   // ✔️ correct
-      console.log("Delta TXT received:", rawText);
-
-      setSelectedDeltaData({
-        raw: rawText,
-      });
-      setShowDeltaModal(true);
-
-      toast?.update(loadingToast, {
-        render: "Delta reasoning loaded!",
-        type: "success",
-        isLoading: false,
-        autoClose: 2000,
-      });
-
-      return rawText;
-
-    } catch (error) {
-      console.error("Delta fetch error:", error);
-
-      toast?.update(loadingToast, {
-        render: `Delta load failed: ${error.message}`,
-        type: "error",
-        isLoading: false,
-        autoClose: 5000,
-      });
-    } finally {
-      setLoadingDelta(false);
+    if (!new_delta_id) {
+      throw new Error("new_delta_id not returned from API");
     }
-  };
+
+    // Save corrected_file_id for later (download / preview)
+    setCorrectedFileId(corrected_file_id);
+
+    // Step 2: Fetch actual delta TXT
+    const deltaResponse = await fetch(
+      `${TRANSLATION_API_BASE_URL}/delta/${new_delta_id}`,
+      { method: "GET" }
+    );
+
+    if (!deltaResponse.ok) {
+      const errorText = await deltaResponse.text();
+      throw new Error(errorText || `HTTP ${deltaResponse.status}`);
+    }
+
+    const rawText = await deltaResponse.text();
+
+    setSelectedDeltaData({
+      raw: rawText,
+      deltaId: new_delta_id,
+      correctedFileId: corrected_file_id,
+    });
+
+    setShowDeltaModal(true);
+
+    toast?.update(loadingToast, {
+      render: "Delta reasoning loaded!",
+      type: "success",
+      isLoading: false,
+      autoClose: 2000,
+    });
+
+    return rawText;
+
+  } catch (error) {
+    console.error("Delta fetch error:", error);
+
+    toast?.update(loadingToast, {
+      render: `Delta load failed: ${error.message}`,
+      type: "error",
+      isLoading: false,
+      autoClose: 5000,
+    });
+  } finally {
+    setLoadingDelta(false);
+  }
+};
 
   const handleViewDelta = (jobId) => {
     const jobStatus = jobStatuses[jobId];
@@ -1846,5 +1941,7 @@ export const useHomeLogic = () => {
     handleViewDelta,
     closeDeltaModal,
     fetchDeltaData,
+    correctedFileId,
+    translationAPI
   };
 };

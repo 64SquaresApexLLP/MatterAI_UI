@@ -5,7 +5,7 @@ pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.vers
 // import AdminPanel from "./Profile.jsx";
 
 const Home = ({ user, onBack, onLogout }) => {
-  const { percentage, query, setQuery, selectedButton, selectedLanguage, showLanguageDropdown, setShowLanguageDropdown, uploadedFiles, setUploadedFiles, isDragOver, isTranslating, translationResult, translationJobs, jobStatuses, evaluationData, previewText, showPreview, setShowPreview, fileInputRef, showTimesheet, setShowTimesheet, showEntries, setShowEntries, isListening, textTranslationResult, setTextTranslationResult, chatResponse, setChatResponse, notificationPermission, handleRequestNotificationPermission, previewFile, previewFileType, toggleListening, handleButtonClick, handleLanguageSelect, handleSubmit, handleFileInputChange, handleDragOver, handleDragLeave, handleDrop, removeFile, handleDownload, handleDownloadAll, fetchEvaluation, refreshEvaluations, extractLanguagesFromPrompt, LANGUAGE_MAPPING, isPotentiallyCJK, handleFileConversion, showDeltaModal, selectedDeltaData, loadingDelta, handleViewDelta, closeDeltaModal, fetchDeltaData } = useHomeLogic();
+  const { percentage, query, setQuery, selectedButton, selectedLanguage, showLanguageDropdown, setShowLanguageDropdown, uploadedFiles, setUploadedFiles, isDragOver, isTranslating, translationResult, translationJobs, jobStatuses, evaluationData, previewText, showPreview, setShowPreview, fileInputRef, showTimesheet, setShowTimesheet, showEntries, setShowEntries, isListening, textTranslationResult, setTextTranslationResult, chatResponse, setChatResponse, notificationPermission, handleRequestNotificationPermission, previewFile, previewFileType, toggleListening, handleButtonClick, handleLanguageSelect, handleSubmit, handleFileInputChange, handleDragOver, handleDragLeave, handleDrop, removeFile, handleDownload, handleDownloadAll, fetchEvaluation, refreshEvaluations, extractLanguagesFromPrompt, LANGUAGE_MAPPING, isPotentiallyCJK, handleFileConversion, showDeltaModal, selectedDeltaData, loadingDelta, handleViewDelta, closeDeltaModal, fetchDeltaData, correctedFileId, translationAPI } = useHomeLogic();
   const { numPages, setNumPages, pageNumber, setPageNumber, selectedJobForPreview, setSelectedJobForPreview, previewingFile, setPreviewingFile, showEvaluationDetails, setShowEvaluationDetails, previewUrl, setPreviewUrl, currentPreviewFileType, setCurrentPreviewFileType, useCJKMode, setUseCJKMode, showJurisdictionDropdown, setShowJurisdictionDropdown, docxPreviewRef, selectedJurisdiction, setSelectedJurisdiction, showPromptSection, setShowPromptSection, showOptionsSection, setShowOptionsSection, showFileSelector, setShowFileSelector, convertingToPdf, setConvertingToPdf, hoveredItem, setHoveredItem, selectedTargetFileType, setSelectedTargetFileType, showFileTypeDropdown, setShowFileTypeDropdown, isExpanded, setIsExpanded } = UseStates();
   const navigate = useNavigate();
 
@@ -138,6 +138,47 @@ const Home = ({ user, onBack, onLogout }) => {
       });
     }
   }, [previewingFile]);
+
+  useEffect(() => {
+  if (showDeltaModal && correctedFileId) {
+    // Force preview panel open
+    setShowPreview(true);
+
+    // Mark preview as "external corrected file"
+    setSelectedJobForPreview(null);
+
+    // Trigger preview load manually
+    (async () => {
+      try {
+        const response = await fetch(
+          `${import.meta.env.VITE_TRANSLATION_API_URL}/download/${correctedFileId}`,
+          { method: "GET" }
+        );
+
+        if (!response.ok) return;
+
+        const contentType = response.headers.get("content-type");
+
+        if (contentType?.includes("pdf")) {
+          const blob = await response.blob();
+          const blobUrl = URL.createObjectURL(blob);
+
+          setPreviewingFile({
+            file: blobUrl,
+            type: "pdf",
+            jobId: null,
+          });
+
+          setUseCJKMode(false);
+          setPreviewUrl(null);
+          setCurrentPreviewFileType("application/pdf");
+        }
+      } catch (err) {
+        console.error("Corrected preview load failed:", err);
+      }
+    })();
+  }
+}, [showDeltaModal, correctedFileId]);
 
   const examplePrompt = selectedJurisdiction
     ? jurisdictionPrompts.get(selectedJurisdiction)
@@ -1205,10 +1246,11 @@ const getAccuracyColor = (accuracy) => {
             <X className="w-4 h-4" />
           </button>
           <h3 className="text-lg font-semibold text-[#062e69]">
-            Select file to preview:
+          {correctedFileId ? "Previewing corrected output:": "Select file to preview:"}
           </h3>
 
-          {translationJobs.length > 0 && (
+          {/* {translationJobs.length > 0 && ( */}
+          {translationJobs.length > 0 && !correctedFileId && (
             <div className="">
               <select
                 value={selectedJobForPreview || ""}
@@ -1410,13 +1452,26 @@ const getAccuracyColor = (accuracy) => {
         </div>
         <center>
           <button
-            onClick={() =>
-              selectedJobForPreview &&
-              handleDownload(selectedJobForPreview)
-            }
+            onClick={() => {
+              if (correctedFileId) {
+                translationAPI.download(correctedFileId)
+                  .then(async (res) => {
+                    const blob = await res.blob();
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = "corrected_file";
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  });
+              } else if (selectedJobForPreview) {
+                handleDownload(selectedJobForPreview);
+              }
+            }}
             disabled={
-              !selectedJobForPreview ||
-              !jobStatuses[selectedJobForPreview]?.download_id
+            !correctedFileId &&
+            (!selectedJobForPreview ||
+            !jobStatuses[selectedJobForPreview]?.download_id)
             }
             className="w-full bg-gradient-to-r from-[#062e69] to-[#062e69]/80 hover:from-[#062e69]/90 hover:to-[#062e69] text-white px-4 py-3 rounded-xl font-medium transition-all duration-200 transform hover:scale-100 hover:shadow-lg hover:shadow-[#062e69]/25 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
           >
