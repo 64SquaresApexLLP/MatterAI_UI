@@ -1,6 +1,8 @@
 import { React, useNavigate, useState, useRef, useEffect, Send, Mic, Paperclip, X, FileText, File, LogOut, User, Languages, Download, Eye, Loader2, CheckCircle, Upload, Bell, BellOff, Clock, AlertCircle, DownloadCloud, TrendingUp, AlertTriangle, Info, Globe, Copy, MessageCircle, FileSymlink, ToastContainer, TimesheetForm, TimesheetEntries, useHomeLogic, notificationHelper, languages, formatFileSize, TimesheetOptions, Document, Page, pdfjs, pdfjsLib, renderAsync, loadNotoCJK, previewCJKPdf, docxPdf, Packer, Paragraph, TextRun, PDFDocument, rgb, Shield, FileWarning, Type, Zap, Settings } from "./Imports.jsx";
 import { jurisdictions, jurisdictionPrompts, legendData, pdfOptions, fileTypeOptions } from "./StaticData.jsx";
 import UseStates from "./UseStates.jsx";
+import { translationRecords } from "./utils/translationRecords.js";
+import History from "./History.jsx";
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 // import AdminPanel from "./Profile.jsx";
 
@@ -8,6 +10,10 @@ const Home = ({ user, onBack, onLogout }) => {
   const { percentage, query, setQuery, selectedButton, selectedLanguage, showLanguageDropdown, setShowLanguageDropdown, uploadedFiles, setUploadedFiles, isDragOver, isTranslating, translationResult, translationJobs, jobStatuses, evaluationData, previewText, showPreview, setShowPreview, fileInputRef, showTimesheet, setShowTimesheet, showEntries, setShowEntries, isListening, textTranslationResult, setTextTranslationResult, chatResponse, setChatResponse, notificationPermission, handleRequestNotificationPermission, previewFile, previewFileType, toggleListening, handleButtonClick, handleLanguageSelect, handleSubmit, handleFileInputChange, handleDragOver, handleDragLeave, handleDrop, removeFile, handleDownload, handleDownloadAll, fetchEvaluation, refreshEvaluations, extractLanguagesFromPrompt, LANGUAGE_MAPPING, isPotentiallyCJK, handleFileConversion, showDeltaModal, selectedDeltaData, loadingDelta, handleViewDelta, closeDeltaModal, fetchDeltaData, correctedFileId, translationAPI } = useHomeLogic();
   const { numPages, setNumPages, pageNumber, setPageNumber, selectedJobForPreview, setSelectedJobForPreview, previewingFile, setPreviewingFile, showEvaluationDetails, setShowEvaluationDetails, previewUrl, setPreviewUrl, currentPreviewFileType, setCurrentPreviewFileType, useCJKMode, setUseCJKMode, showJurisdictionDropdown, setShowJurisdictionDropdown, docxPreviewRef, selectedJurisdiction, setSelectedJurisdiction, showPromptSection, setShowPromptSection, showOptionsSection, setShowOptionsSection, showFileSelector, setShowFileSelector, convertingToPdf, setConvertingToPdf, hoveredItem, setHoveredItem, selectedTargetFileType, setSelectedTargetFileType, showFileTypeDropdown, setShowFileTypeDropdown, isExpanded, setIsExpanded } = UseStates();
   const navigate = useNavigate();
+
+  const translate_url=import.meta.env.VITE_TRANSLATION_API_URL;
+
+  const { records, loading } = translationRecords(translate_url);
 
   const isSuperAdmin =
     user?.user?.role_name === "SuperAdmin" || user?.role_name === "SuperAdmin";
@@ -472,7 +478,7 @@ const getAccuracyColor = (accuracy) => {
           </div>
         )}
       {notificationHelper.isSupported() && (
-        <div className="fixed bottom-4 left-4 z-50">
+        <div className="fixed bottom-4 right-4 z-50">
           <div
             className={`flex items-center gap-2 px-3 py-2 rounded-lg shadow-md text-sm ${
               notificationPermission === "granted"
@@ -506,16 +512,21 @@ const getAccuracyColor = (accuracy) => {
         <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-[#062e69]/15 rounded-full blur-3xl animate-pulse delay-1000"></div>
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-[#062e69]/10 rounded-full blur-2xl animate-ping"></div>
       </div>
-      <div className="absolute top-4 left-4 z-20">
+      <History
+        user={user}
+        records={records}
+        loading={loading}
+      />
+      {/* <div className="absolute top-4 left-4 z-20">
         <button
           className="flex items-center space-x-4 rounded-xl px-4 py-2 text-white hover:bg-white/10 transition-colors"
           onClick={onBack}
         >
           ← Back to Chatbot Selection
         </button>
-      </div>
+      </div> */}
   
-      <div className="absolute top-4 right-4 z-20">
+      {/* <div className="absolute top-4 right-4 z-20">
         <div className="flex items-center space-x-4 bg-white/90 backdrop-blur-xl border border-[#062e69]/30 rounded-xl px-4 py-2 shadow-lg">
           <div className="flex items-center space-x-2 text-[#062e69]">
             <User className="w-4 h-4" />
@@ -550,7 +561,7 @@ const getAccuracyColor = (accuracy) => {
             <span>Logout</span>
           </button>
         </div>
-      </div>
+      </div> */}
       <div
       className={`
         // ${showPreview || showDeltaModal ? "w-[30vw]" : "w-full"}

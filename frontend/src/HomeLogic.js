@@ -5,7 +5,8 @@ import { queryAPI } from "./api/apiService.js";
 // import UseStates from "./UseStates.jsx";
 
 const TRANSLATION_API_BASE_URL = import.meta.env.VITE_TRANSLATION_API_URL;
-
+const authToken = localStorage.getItem("authToken");
+console.log("authToken in HomeLogic:", authToken);
 export const detectCJKLanguage = (filename, targetLanguage) => {
   const cjkLanguages = ['chinese', 'mandarin', 'cantonese', 'japanese', 'korean', 'zh', 'ja', 'ko', 'cn', 'jp', 'kr'];
 
@@ -138,6 +139,9 @@ export const translationAPI = {
     // Citations like [0001] and patent references are preserved in translated files
     const response = await fetch(`${TRANSLATION_API_BASE_URL}/translate_file_convo`, {
       method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${authToken}`,  // Include JWT token from login
+      },
       body: formData,
     });
 
@@ -198,6 +202,9 @@ export const translationAPI = {
         console.log(`  [${file.name}] Sending parallel API request...`);
         const response = await fetch(`${TRANSLATION_API_BASE_URL}/translate_file_convo`, {
           method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${authToken}`,  // Include JWT token from login
+          },
           body: formData,
         });
 
@@ -309,6 +316,9 @@ export const translationAPI = {
         const response = await fetch(`${TRANSLATION_API_BASE_URL}/translate_file_convo`, {
           method: 'POST',
           body: formData,
+          headers: {
+            'Authorization': `Bearer ${authToken}`,  // Include JWT token from login
+          },
         });
 
         if (!response.ok) {
@@ -1164,6 +1174,9 @@ export const useHomeLogic = () => {
 
         const response = await fetch(`${TRANSLATION_API_BASE_URL}/translate_file_convo`, {
           method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${authToken}`,  // Include JWT token from login
+          },
           body: formData
         });
 
@@ -1795,7 +1808,8 @@ const fetchDeltaData = async (deltaId, jobId) => {
   try {
     // Step 1: Fetch metadata (new_delta_id + corrected_file_id)
     const metaResponse = await fetch(
-      `${TRANSLATION_API_BASE_URL}/delta/${deltaId}/with-translations`,
+      // `${TRANSLATION_API_BASE_URL}/delta/${deltaId}/with-translations`,
+      `${TRANSLATION_API_BASE_URL}/delta/${deltaId}/`,
       { method: "GET" }
     );
 
