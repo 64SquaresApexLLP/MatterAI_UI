@@ -184,7 +184,7 @@ const TranslationViewer = ({ records }) => {
       </div>
 
       {/* Content - Side by Side */}
-      <div className="max-w-7xl mx-auto p-6">
+      <div className="w-full mx-auto p-6">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Original Document */}
           <div className="flex flex-col space-y-3">

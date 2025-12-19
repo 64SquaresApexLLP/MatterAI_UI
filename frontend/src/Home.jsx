@@ -145,6 +145,16 @@ const Home = ({ user, onBack, onLogout }) => {
     }
   }, [previewingFile]);
 
+  const canShowPreview =
+  showPreview &&
+  (
+    correctedFileId ||
+    (
+      selectedJobForPreview &&
+      jobStatuses[selectedJobForPreview]?.status === "COMPLETED"
+    )
+  );
+
   useEffect(() => {
   if (showDeltaModal && correctedFileId) {
     // Force preview panel open
@@ -466,7 +476,7 @@ const getAccuracyColor = (accuracy) => {
       />
       {notificationHelper.isSupported() &&
         notificationPermission !== "granted" && (
-          <div className="fixed top-18 right-4 z-50">
+          <div className="fixed top-4 right-4 z-50">
             <button
               onClick={handleRequestNotificationPermission}
               className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg transition-colors"
@@ -516,6 +526,7 @@ const getAccuracyColor = (accuracy) => {
         user={user}
         records={records}
         loading={loading}
+        onLogout={onLogout}
       />
       {/* <div className="absolute top-4 left-4 z-20">
         <button
@@ -564,15 +575,14 @@ const getAccuracyColor = (accuracy) => {
       </div> */}
       <div
       className={`
-        // ${showPreview || showDeltaModal ? "w-[30vw]" : "w-full"}
-        ${showPreview && !showDeltaModal ? "w-[50vw]" : showPreview && showDeltaModal ? "w-[30vw]" : "w-full"}
+        ${canShowPreview && !showDeltaModal ? "w-[50vw]" : canShowPreview && showDeltaModal ? "w-[30vw]" : "w-full"}
         transition-all duration-300
         max-h-screen overflow-y-auto p-6
       `}
       >
         <div
           className={`relative z-10 w-full mx-auto transition-all duration-300 ${
-            showPreview ? "max-w-3xl" : "max-w-5xl"
+            canShowPreview ? "max-w-3xl" : "max-w-5xl"
           }`}
         >
           <div className="text-center mb-12 animate-fade-in pt-16">
@@ -1243,7 +1253,8 @@ const getAccuracyColor = (accuracy) => {
           )}
         </div>
       </div>
-      {showPreview && ( 
+    {/* {showPreview && (  */}
+      {canShowPreview && (
     <div className={`fixed top-0 h-full ${showDeltaModal ? "right-[35vw] w-[35vw] bg-white/5 backdrop-blur-sm border-l border-white/10" : "right-0 w-[50vw]"} p-2 overflow-y-auto z-40`}>
     <div className="h-full bg-white/95 backdrop-blur-xl border border-[#062e69]/30 rounded-2xl shadow-lg flex flex-col overflow-y-auto max-h-screen">
       {/* Header Section */}
