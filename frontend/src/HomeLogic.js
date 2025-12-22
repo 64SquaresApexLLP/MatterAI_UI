@@ -185,6 +185,32 @@ export const translationAPI = {
     return data;
   },
 
+  deleteTranslationRecord: async (translationId) => {
+    if (!translationId) throw new Error("translationId required");
+    const response = await fetch(
+      `${TRANSLATION_API_BASE_URL}/translation-records/${translationId}`,
+      {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${getAuthToken()}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const errText = await response.text().catch(() => null);
+      throw new Error(errText || `HTTP ${response.status}`);
+    }
+
+    // attempt to parse JSON response if present
+    const text = await response.text().catch(() => null);
+    try {
+      return text ? JSON.parse(text) : { success: true };
+    } catch (e) {
+      return { success: true, message: text };
+    }
+  },
+
   translateFileConvo: async (files, targetLanguage) => {
     const backendLanguage =
       LANGUAGE_MAPPING[targetLanguage] || targetLanguage.toLowerCase();
@@ -2033,35 +2059,98 @@ export const useHomeLogic = () => {
         throw new Error(errorText || `HTTP ${metaResponse.status}`);
       }
 
-      const { new_delta_id, corrected_file_id } = await metaResponse.json();
+      // Try to parse metaResponse as JSON; if backend returned a text file
+      // (attachment/plain) treat it as the delta text and show immediately.
+      let new_delta_id = null;
+      let corrected_file_id = null;
+      let rawText = null;
 
-      if (!new_delta_id) {
-        throw new Error("new_delta_id not returned from API");
+      const contentType = (metaResponse.headers.get("content-type") || "").toLowerCase();
+      const contentDisp = (metaResponse.headers.get("content-disposition") || "").toLowerCase();
+
+      if (contentType.includes("application/json")) {
+        // Normal case: meta JSON with new_delta_id
+        const metaJson = await metaResponse.json();
+        new_delta_id = metaJson.new_delta_id;
+        corrected_file_id = metaJson.corrected_file_id;
+
+        if (!new_delta_id) {
+          throw new Error("new_delta_id not returned from API");
+        }
+
+        // Save corrected_file_id for later (download / preview)
+        setCorrectedFileId(corrected_file_id);
+
+        // Step 2: Fetch actual delta TXT
+        const deltaResponse = await fetch(
+          `${TRANSLATION_API_BASE_URL}/delta/${new_delta_id}`,
+          { method: "GET" }
+        );
+
+        if (!deltaResponse.ok) {
+          const errorText = await deltaResponse.text();
+          throw new Error(errorText || `HTTP ${deltaResponse.status}`);
+        }
+
+        rawText = await deltaResponse.text();
+
+        setSelectedDeltaData({
+          raw: rawText,
+          deltaId: new_delta_id,
+          correctedFileId: corrected_file_id,
+        });
+
+        setShowDeltaModal(true);
+      } else if (contentType.startsWith("text/") || contentDisp.includes("attachment") ) {
+        // Backend returned the delta text file directly for the meta request.
+        rawText = await metaResponse.text();
+
+        setSelectedDeltaData({
+          raw: rawText,
+          deltaId: deltaId,
+          correctedFileId: null,
+        });
+
+        setShowDeltaModal(true);
+      } else {
+        // Fallback: attempt to parse JSON, but if it fails, treat as text
+        try {
+          const metaJson = await metaResponse.json();
+          new_delta_id = metaJson.new_delta_id;
+          corrected_file_id = metaJson.corrected_file_id;
+
+          if (!new_delta_id) {
+            throw new Error("new_delta_id not returned from API");
+          }
+
+          setCorrectedFileId(corrected_file_id);
+
+          const deltaResponse = await fetch(
+            `${TRANSLATION_API_BASE_URL}/delta/${new_delta_id}`,
+            { method: "GET" }
+          );
+
+          if (!deltaResponse.ok) {
+            const errorText = await deltaResponse.text();
+            throw new Error(errorText || `HTTP ${deltaResponse.status}`);
+          }
+
+          rawText = await deltaResponse.text();
+
+          setSelectedDeltaData({
+            raw: rawText,
+            deltaId: new_delta_id,
+            correctedFileId: corrected_file_id,
+          });
+
+          setShowDeltaModal(true);
+        } catch (err) {
+          // If JSON parse failed, read as text and show
+          rawText = await metaResponse.text();
+          setSelectedDeltaData({ raw: rawText, deltaId: deltaId, correctedFileId: null });
+          setShowDeltaModal(true);
+        }
       }
-
-      // Save corrected_file_id for later (download / preview)
-      setCorrectedFileId(corrected_file_id);
-
-      // Step 2: Fetch actual delta TXT
-      const deltaResponse = await fetch(
-        `${TRANSLATION_API_BASE_URL}/delta/${new_delta_id}`,
-        { method: "GET" }
-      );
-
-      if (!deltaResponse.ok) {
-        const errorText = await deltaResponse.text();
-        throw new Error(errorText || `HTTP ${deltaResponse.status}`);
-      }
-
-      const rawText = await deltaResponse.text();
-
-      setSelectedDeltaData({
-        raw: rawText,
-        deltaId: new_delta_id,
-        correctedFileId: corrected_file_id,
-      });
-
-      setShowDeltaModal(true);
 
       toast?.update(loadingToast, {
         render: "Delta reasoning loaded!",

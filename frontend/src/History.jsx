@@ -1,6 +1,8 @@
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
-import { Menu, X, User, Settings, LogOut } from "lucide-react";
+import { Menu, X, User, Settings, LogOut, Trash2 } from "lucide-react";
+import { toast } from "react-toastify";
+import { translationAPI } from "./HomeLogic";
 
 const formatDate = (iso) =>
   new Date(iso).toLocaleString("en-IN", {
@@ -30,8 +32,7 @@ const History = ({ user, onLogout, records, loading }) => {
     user?.user?.role_name === "SuperAdmin" || user?.role_name === "SuperAdmin";
   const isOrgAdmin =
     user?.user?.role_name === "OrgAdmin" || user?.role_name === "OrgAdmin";
-  const isUser = 
-    user?.user?.role_name === "User" || user?.role_name === "User";
+  const isUser = user?.user?.role_name === "User" || user?.role_name === "User";
 
   return (
     <>
@@ -69,9 +70,7 @@ const History = ({ user, onLogout, records, loading }) => {
         {/* Content - Scrollable middle section */}
         <div className="flex-1 overflow-y-auto">
           {loading && (
-            <p className="p-4 text-sm text-gray-300">
-              Loading translations...
-            </p>
+            <p className="p-4 text-sm text-gray-300">Loading translations...</p>
           )}
 
           {!loading && records.length === 0 && (
@@ -82,16 +81,16 @@ const History = ({ user, onLogout, records, loading }) => {
 
           {!loading &&
             records.map((item) => (
-              <button
-                key={item.translation_id}
+              <div
+                key={item.job_id || item.translation_id || item.translationId || item.id}
+                className="w-full px-4 py-3 border-b border-[#2d4a6f]/30 hover:bg-[#244166]/50 transition-colors flex items-center justify-between cursor-pointer"
                 onClick={() =>
-                  navigate(`/translate/${item.translation_id}`, { 
-                    state: { record: item } 
+                  navigate(`/translate/${item.translation_id || item.job_id || item.translationId || item.id}`, {
+                    state: { record: item },
                   })
                 }
-                className="w-full text-left px-4 py-3 border-b border-[#2d4a6f]/30 hover:bg-[#244166]/50 transition-colors"
               >
-                <div className="flex flex-col gap-1">
+                <div className="flex flex-col gap-1 flex-1">
                   {/* Filename */}
                   <span className="text-sm font-medium text-white truncate">
                     {item.original_filename}
@@ -112,7 +111,35 @@ const History = ({ user, onLogout, records, loading }) => {
                     </span>
                   </div>
                 </div>
-              </button>
+
+                {/* Delete button */}
+                <button
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    const ok = window.confirm(
+                      "Delete this translation record? This cannot be undone."
+                    );
+                    if (!ok) return;
+
+                    try {
+                      const idToDelete = item.job_id || item.translation_id || item.translationId || item.id;
+                      await translationAPI.deleteTranslationRecord(idToDelete);
+
+                      toast.success("Translation record deleted");
+
+                      // reload to refresh records (keeps parent simple)
+                      window.location.reload();
+                    } catch (err) {
+                      console.error("Delete failed:", err);
+                      toast.error("Delete failed: " + (err.message || err));
+                    }
+                  }}
+                  className="ml-3 p-2 rounded hover:bg-white/10"
+                  title="Delete"
+                >
+                  <Trash2 className="w-4 h-4 text-red-300" />
+                </button>
+              </div>
             ))}
         </div>
 
