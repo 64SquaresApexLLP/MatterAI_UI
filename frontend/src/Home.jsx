@@ -11,6 +11,8 @@ const Home = ({ user, onBack, onLogout }) => {
   const { numPages, setNumPages, pageNumber, setPageNumber, selectedJobForPreview, setSelectedJobForPreview, previewingFile, setPreviewingFile, showEvaluationDetails, setShowEvaluationDetails, previewUrl, setPreviewUrl, currentPreviewFileType, setCurrentPreviewFileType, useCJKMode, setUseCJKMode, showJurisdictionDropdown, setShowJurisdictionDropdown, docxPreviewRef, selectedJurisdiction, setSelectedJurisdiction, showPromptSection, setShowPromptSection, showOptionsSection, setShowOptionsSection, showFileSelector, setShowFileSelector, convertingToPdf, setConvertingToPdf, hoveredItem, setHoveredItem, selectedTargetFileType, setSelectedTargetFileType, showFileTypeDropdown, setShowFileTypeDropdown, isExpanded, setIsExpanded } = UseStates();
   const navigate = useNavigate();
 
+  const [isHistoryOpen, setIsHistoryOpen] = useState(true);
+
   const translate_url=import.meta.env.VITE_TRANSLATION_API_URL;
 
   const { records, loading } = translationRecords(translate_url);
@@ -144,6 +146,8 @@ const Home = ({ user, onBack, onLogout }) => {
       });
     }
   }, [previewingFile]);
+
+  const previewWidth = showDeltaModal ? "30vw" : "50vw";
 
   const canShowPreview =
   showPreview &&
@@ -419,6 +423,11 @@ const getStatusColor = (status) => {
   }
 };
 
+const hasProcessingJobs = () =>
+  Object.values(jobStatuses || {}).some(
+    (j) => j?.status === "PROCESSING"
+  );
+
 const getAccuracyColor = (accuracy) => {
   if (accuracy >= 80) return "text-green-600 bg-green-50 border-green-200";
   if (accuracy >= 60) return "text-yellow-600 bg-yellow-50 border-yellow-200";
@@ -431,6 +440,23 @@ const getAccuracyColor = (accuracy) => {
     console.log("Job Statuses:", jobStatuses);
     console.log("Evaluation Data:", evaluationData);
   }, [translationJobs, jobStatuses, evaluationData]);
+
+  useEffect(() => {
+  const handleBeforeUnload = (e) => {
+    if (hasProcessingJobs()) {
+      e.preventDefault();
+      e.returnValue =
+        "Your translation is still processing. Refreshing or closing the window may result in a failed translation.";
+      return e.returnValue;
+    }
+  };
+
+  window.addEventListener("beforeunload", handleBeforeUnload);
+
+  return () => {
+    window.removeEventListener("beforeunload", handleBeforeUnload);
+  };
+}, [jobStatuses]);
 
   return (
   <div className="min-h-screen bg-gradient-to-br from-slate-900 via-[#062e69] to-slate-800 flex relative overflow-hidden"
@@ -527,58 +553,20 @@ const getAccuracyColor = (accuracy) => {
         records={records}
         loading={loading}
         onLogout={onLogout}
+        onToggle={setIsHistoryOpen}
       />
-      {/* <div className="absolute top-4 left-4 z-20">
-        <button
-          className="flex items-center space-x-4 rounded-xl px-4 py-2 text-white hover:bg-white/10 transition-colors"
-          onClick={onBack}
-        >
-          ← Back to Chatbot Selection
-        </button>
-      </div> */}
-  
-      {/* <div className="absolute top-4 right-4 z-20">
-        <div className="flex items-center space-x-4 bg-white/90 backdrop-blur-xl border border-[#062e69]/30 rounded-xl px-4 py-2 shadow-lg">
-          <div className="flex items-center space-x-2 text-[#062e69]">
-            <User className="w-4 h-4" />
-            <span>{isSuperAdmin ? "Welcome SuperAdmin" : isOrgAdmin ? "Welcome OrgAdmin" : isUser ? "Welcome User" : "Welcome"}</span>
-          </div>
-           {(isUser) && (
-              <button
-                onClick={() =>navigate("/profile")}
-                className="flex items-center space-x-1 text-[#062e69]/70 hover:text-[#062e69] transition-colors duration-200 text-sm font-medium"
-                title="Admin Panel"
-              >
-                <Settings className="w-4 h-4" />
-                <span>Edit Profile</span>
-              </button>
-            )}
-            {(isSuperAdmin || isOrgAdmin) && (
-              <button
-                onClick={() => navigate("/profile")}
-                className="flex items-center space-x-1 text-[#062e69]/70 hover:text-[#062e69] transition-colors duration-200 text-sm font-medium"
-                title="Admin Panel"
-              >
-                <Settings className="w-4 h-4" />
-                <span>Edit Profile & User Mgt</span>
-              </button>
-            )}
-          <button
-            onClick={onLogout}
-            className="flex items-center space-x-1 text-[#062e69]/70 hover:text-[#062e69] transition-colors duration-200 text-sm font-medium"
-            title="Logout"
-          >
-            <LogOut className="w-4 h-4" />
-            <span>Logout</span>
-          </button>
-        </div>
-      </div> */}
       <div
-      className={`
-        ${canShowPreview && !showDeltaModal ? "w-[50vw]" : canShowPreview && showDeltaModal ? "w-[30vw]" : "w-full"}
-        transition-all duration-300
-        max-h-screen overflow-y-auto p-6
-      `}
+        className="transition-all duration-300 max-h-screen overflow-y-auto p-6"
+        style={{
+          width: canShowPreview
+            ? isHistoryOpen
+              ? `calc(100vw - 320px - ${previewWidth})`
+              : previewWidth
+            : isHistoryOpen
+              ? "calc(100vw - 320px)"
+              : "100vw",
+          marginLeft: isHistoryOpen ? "320px" : "0",
+        }}
       >
         <div
           className={`relative z-10 w-full mx-auto transition-all duration-300 ${
@@ -1436,41 +1424,6 @@ const getAccuracyColor = (accuracy) => {
               {/* </p> */}
             </div>
           )}
-          {/* <div className="bg-white rounded-xl shadow-2xl p-2 max-w-xs border border-gray-200">
-            <div
-              className="flex justify-between items-center cursor-pointer"
-              onClick={() => setIsExpanded(!isExpanded)}
-            >
-              <h3 className="text-sm font-bold text-gray-800 mb-0 pb-0 pr-2">
-                Delta Legend
-              </h3>
-              <button className="text-gray-500 hover:text-gray-700 focus:outline-none pb-1">
-                {isExpanded ? '−' : '+'}
-              </button>
-            </div>
-            {isExpanded && (
-              <div className="space-y-2 max-h-96 overflow-y-auto">
-                {legendData.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex items-center gap-2 p-0 transition-all duration-200 cursor-pointer"
-                    onMouseEnter={() => setHoveredItem(item.id)}
-                    onMouseLeave={() => setHoveredItem(null)}
-                  >
-                    <div
-                      className="w-4 h-4 rounded shadow-sm flex-shrink-0 transition-transform duration-200 hover:scale-110"
-                      style={{ backgroundColor: item.color }}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium text-gray-700 hover:text-black truncate">
-                        {item.label}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div> */}
         </div>
         <center>
           <button

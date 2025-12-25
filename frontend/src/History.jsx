@@ -24,9 +24,15 @@ const resolveUserLabel = (record) => {
   return "You";
 };
 
-const History = ({ user, onLogout, records, loading }) => {
+const History = ({ user, onLogout, records, loading, onToggle }) => {
   const [open, setOpen] = useState(true);
   const navigate = useNavigate();
+
+  const toggle = () => {
+    const next = !open;
+    setOpen(next);
+    onToggle?.(next);
+  };
 
   const isSuperAdmin =
     user?.user?.role_name === "SuperAdmin" || user?.role_name === "SuperAdmin";
@@ -38,7 +44,7 @@ const History = ({ user, onLogout, records, loading }) => {
     <>
       {/* Hamburger Button - Fixed position */}
       <button
-        onClick={() => setOpen(!open)}
+        onClick={toggle}
         className="fixed top-4 left-4 z-50 p-2 bg-[#1e3a5f] border border-[#2d4a6f] rounded-lg shadow-lg hover:bg-[#244166] transition-colors"
         aria-label="Toggle sidebar"
       >
