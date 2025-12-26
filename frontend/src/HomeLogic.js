@@ -1191,8 +1191,6 @@ export const useHomeLogic = () => {
       } else {
         console.warn("No jobs returned from translation API");
       }
-
-      setShowPreview(true);
     } catch (error) {
       console.error("Translation error:", error);
       const errorMessage = `Translation failed: ${error.message}`;
@@ -2065,8 +2063,12 @@ export const useHomeLogic = () => {
       let corrected_file_id = null;
       let rawText = null;
 
-      const contentType = (metaResponse.headers.get("content-type") || "").toLowerCase();
-      const contentDisp = (metaResponse.headers.get("content-disposition") || "").toLowerCase();
+      const contentType = (
+        metaResponse.headers.get("content-type") || ""
+      ).toLowerCase();
+      const contentDisp = (
+        metaResponse.headers.get("content-disposition") || ""
+      ).toLowerCase();
 
       if (contentType.includes("application/json")) {
         // Normal case: meta JSON with new_delta_id
@@ -2101,7 +2103,10 @@ export const useHomeLogic = () => {
         });
 
         setShowDeltaModal(true);
-      } else if (contentType.startsWith("text/") || contentDisp.includes("attachment") ) {
+      } else if (
+        contentType.startsWith("text/") ||
+        contentDisp.includes("attachment")
+      ) {
         // Backend returned the delta text file directly for the meta request.
         rawText = await metaResponse.text();
 
@@ -2147,7 +2152,11 @@ export const useHomeLogic = () => {
         } catch (err) {
           // If JSON parse failed, read as text and show
           rawText = await metaResponse.text();
-          setSelectedDeltaData({ raw: rawText, deltaId: deltaId, correctedFileId: null });
+          setSelectedDeltaData({
+            raw: rawText,
+            deltaId: deltaId,
+            correctedFileId: null,
+          });
           setShowDeltaModal(true);
         }
       }

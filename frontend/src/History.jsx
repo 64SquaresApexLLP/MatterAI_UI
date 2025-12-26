@@ -88,15 +88,28 @@ const History = ({ user, onLogout, records, loading, onToggle }) => {
           {!loading &&
             records.map((item) => (
               <div
-                key={item.job_id || item.translation_id || item.translationId || item.id}
+                key={
+                  item.job_id ||
+                  item.translation_id ||
+                  item.translationId ||
+                  item.id
+                }
                 className="w-full px-4 py-3 border-b border-[#2d4a6f]/30 hover:bg-[#244166]/50 transition-colors flex items-center justify-between cursor-pointer"
                 onClick={() =>
-                  navigate(`/translate/${item.translation_id || item.job_id || item.translationId || item.id}`, {
-                    state: { record: item },
-                  })
+                  navigate(
+                    `/translate/${
+                      item.translation_id ||
+                      item.job_id ||
+                      item.translationId ||
+                      item.id
+                    }`,
+                    {
+                      state: { record: item },
+                    }
+                  )
                 }
               >
-                <div className="flex flex-col gap-1 flex-1">
+                <div className="flex flex-col gap-1 flex-1 min-w-0">
                   {/* Filename */}
                   <span className="text-sm font-medium text-white truncate">
                     {item.original_filename}
@@ -128,7 +141,11 @@ const History = ({ user, onLogout, records, loading, onToggle }) => {
                     if (!ok) return;
 
                     try {
-                      const idToDelete = item.job_id || item.translation_id || item.translationId || item.id;
+                      const idToDelete =
+                        item.job_id ||
+                        item.translation_id ||
+                        item.translationId ||
+                        item.id;
                       await translationAPI.deleteTranslationRecord(idToDelete);
 
                       toast.success("Translation record deleted");
@@ -140,7 +157,7 @@ const History = ({ user, onLogout, records, loading, onToggle }) => {
                       toast.error("Delete failed: " + (err.message || err));
                     }
                   }}
-                  className="ml-3 p-2 rounded hover:bg-white/10"
+                  className="ml-3 p-2 rounded hover:bg-white/10 flex-shrink-0"
                   title="Delete"
                 >
                   <Trash2 className="w-4 h-4 text-red-300" />
