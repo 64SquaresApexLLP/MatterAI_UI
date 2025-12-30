@@ -85,7 +85,9 @@ const Home = ({ user, onBack, onLogout }) => {
     isTranslating,
     translationResult,
     translationJobs,
+    setTranslationJobs,
     jobStatuses,
+    setJobStatuses,
     evaluationData,
     previewText,
     showPreview,
@@ -172,6 +174,9 @@ const Home = ({ user, onBack, onLogout }) => {
   const navigate = useNavigate();
 
   const [isHistoryOpen, setIsHistoryOpen] = useState(true);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [jobToCancel, setJobToCancel] = useState(null);
+  const [isCancelling, setIsCancelling] = useState(false);
 
   const translate_url = import.meta.env.VITE_TRANSLATION_API_URL;
 
@@ -614,6 +619,48 @@ const Home = ({ user, onBack, onLogout }) => {
     };
   }, [jobStatuses]);
 
+  const handleCancelClick = (job) => {
+    setJobToCancel(job);
+    setShowCancelModal(true);
+  };
+
+  const handleCancelConfirm = async () => {
+    if (!jobToCancel || isCancelling) return;
+
+    setIsCancelling(true);
+    
+    try {
+      const result = await translationAPI.cancelTranslation(jobToCancel.job_id);
+      toast.success(`Translation cancelled: ${jobToCancel.filename}`);
+      
+      // Close modal immediately
+      setShowCancelModal(false);
+      setJobToCancel(null);
+      
+      // Update job status locally without reloading
+      setJobStatuses((prev) => ({
+        ...prev,
+        [jobToCancel.job_id]: {
+          ...prev[jobToCancel.job_id],
+          status: "CANCELLED",
+        },
+      }));
+      
+    } catch (error) {
+      toast.error(`Failed to cancel: ${error.message}`);
+    } finally {
+      setIsCancelling(false);
+      setShowCancelModal(false);
+      setJobToCancel(null);
+    }
+  };
+
+  const handleCancelModalClose = () => {
+    if (isCancelling) return; // Prevent closing while cancelling
+    setShowCancelModal(false);
+    setJobToCancel(null);
+  };
+
   return (
     <div
       className="min-h-screen bg-gradient-to-br from-slate-900 via-[#062e69] to-slate-800 flex relative overflow-hidden"
@@ -1028,8 +1075,34 @@ const Home = ({ user, onBack, onLogout }) => {
                     )}
                   </h3>
                   <button
-                    onClick={() => {
-                      setUploadedFiles([]);
+                    onClick={async () => {
+                      try {
+                        // Clear cancelled jobs from backend
+                        await translationAPI.clearCancelledJobs();
+                        
+                        // Clear uploaded files from frontend
+                        setUploadedFiles([]);
+                        
+                        // Remove cancelled jobs from UI by filtering them out
+                        const filteredJobs = translationJobs.filter(
+                          job => jobStatuses[job.job_id]?.status !== "CANCELLED"
+                        );
+                        setTranslationJobs(filteredJobs);
+                        
+                        // Update job statuses to remove cancelled ones
+                        const filteredStatuses = { ...jobStatuses };
+                        Object.keys(filteredStatuses).forEach(jobId => {
+                          if (filteredStatuses[jobId]?.status === "CANCELLED") {
+                            delete filteredStatuses[jobId];
+                          }
+                        });
+                        setJobStatuses(filteredStatuses);
+                        
+                        toast.success("All files and cancelled jobs cleared");
+                      } catch (error) {
+                        console.error("Error clearing:", error);
+                        toast.error("Failed to clear cancelled jobs");
+                      }
                     }}
                     className="text-[#062e69]/70 hover:text-[#062e69] text-sm transition-colors duration-200 font-medium"
                   >
@@ -1112,6 +1185,20 @@ const Home = ({ user, onBack, onLogout }) => {
                               key={job.job_id}
                               className="bg-white rounded-lg p-3 border border-[#062e69]/10 hover:bg-[#062e69]/5 transition-all duration-200"
                             >
+                              {/* Show large cancel button for PROCESSING/QUEUED jobs */}
+                              {(status?.status === "PROCESSING" ||
+                                status?.status === "QUEUED") && (
+                                <div className="mb-3 pb-3 border-b border-[#062e69]/10">
+                                  <button
+                                    onClick={() => handleCancelClick(job)}
+                                    className="w-full px-4 py-2.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg font-medium transition-all duration-200 flex items-center justify-center space-x-2 border border-red-200 hover:border-red-300"
+                                  >
+                                    <X className="w-5 h-5" />
+                                    <span>Cancel Translation</span>
+                                  </button>
+                                </div>
+                              )}
+
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center space-x-3 flex-1 min-w-0">
                                   <div className="flex-1 min-w-0">
@@ -1712,6 +1799,79 @@ const Home = ({ user, onBack, onLogout }) => {
                 <Download className="w-4 h-4" />
                 <span>Download TXT Report</span>
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cancel Confirmation Modal */}
+      {showCancelModal && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+          onClick={(e) => {
+            // Close modal when clicking outside, but not while cancelling
+            if (e.target === e.currentTarget && !isCancelling) {
+              handleCancelModalClose();
+            }
+          }}
+        >
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden animate-slide-up">
+            <div className="bg-gradient-to-r from-red-500 to-red-600 p-6">
+              <div className="flex items-center space-x-3">
+                <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
+                  <AlertTriangle className="w-6 h-6 text-white" />
+                </div>
+                <h3 className="text-xl font-semibold text-white">
+                  Cancel Translation?
+                </h3>
+              </div>
+            </div>
+            
+            <div className="p-6">
+              <p className="text-gray-700 mb-2">
+                Are you sure you want to cancel the translation for:
+              </p>
+              <p className="text-[#062e69] font-semibold mb-4">
+                {jobToCancel?.filename}
+              </p>
+              <p className="text-sm text-gray-600 mb-6">
+                This action cannot be undone. The translation progress will be lost.
+              </p>
+
+              <div className="flex space-x-3">
+                <button
+                  onClick={handleCancelModalClose}
+                  disabled={isCancelling}
+                  className={`flex-1 px-4 py-2.5 rounded-lg font-medium transition-colors ${
+                    isCancelling
+                      ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                      : "bg-gray-100 hover:bg-gray-200 text-gray-700"
+                  }`}
+                >
+                  No, Keep It
+                </button>
+                <button
+                  onClick={handleCancelConfirm}
+                  disabled={isCancelling}
+                  className={`flex-1 px-4 py-2.5 rounded-lg font-medium transition-colors flex items-center justify-center space-x-2 ${
+                    isCancelling
+                      ? "bg-red-300 cursor-not-allowed"
+                      : "bg-red-500 hover:bg-red-600"
+                  } text-white`}
+                >
+                  {isCancelling ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Cancelling...</span>
+                    </>
+                  ) : (
+                    <>
+                      <X className="w-4 h-4" />
+                      <span>Yes, Cancel</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>

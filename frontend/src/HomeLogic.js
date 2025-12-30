@@ -220,6 +220,70 @@ export const translationAPI = {
     );
   },
 
+  // Cancel a translation job
+  cancelTranslation: async (jobId) => {
+    if (!jobId) {
+      throw new Error("Job ID is required to cancel translation");
+    }
+
+    try {
+      const response = await fetch(
+        `${TRANSLATION_API_BASE_URL}/cancel_translation/${jobId}`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${getAuthToken()}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response
+          .json()
+          .catch(() => ({ detail: "Failed to cancel translation" }));
+        throw new Error(
+          errorData.detail || `HTTP ${response.status}: ${response.statusText}`
+        );
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error(`Error cancelling job ${jobId}:`, error);
+      throw error;
+    }
+  },
+
+  // Clear all cancelled job records
+  clearCancelledJobs: async () => {
+    try {
+      const response = await fetch(
+        `${TRANSLATION_API_BASE_URL}/clear_cancelled_jobs`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${getAuthToken()}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response
+          .json()
+          .catch(() => ({ detail: "Failed to clear cancelled jobs" }));
+        throw new Error(
+          errorData.detail || `HTTP ${response.status}: ${response.statusText}`
+        );
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error("Error clearing cancelled jobs:", error);
+      throw error;
+    }
+  },
+
   // NEW: Translate multiple files to single language (PARALLEL PROCESSING)
   translateMultipleFilesToSingleLanguage: async (
     files,
@@ -816,6 +880,7 @@ export const useHomeLogic = () => {
           [jobId]: status,
         }));
 
+        // Stop polling for terminal states
         if (status.status === "COMPLETED") {
           console.log(`✅ Job ${jobId} completed after ${attempts} attempts!`);
 
@@ -833,6 +898,12 @@ export const useHomeLogic = () => {
           // Show completion notification
           notificationHelper.show("Translation Complete", {
             body: `${filename} has been translated successfully!`,
+          });
+          return status;
+        } else if (status.status === "CANCELLED") {
+          console.log(`⚠️ Job ${jobId} was cancelled after ${attempts} attempts`);
+          notificationHelper.show("Translation Cancelled", {
+            body: `${filename} translation was cancelled.`,
           });
           return status;
         } else if (status.status === "FAILED") {
@@ -1180,13 +1251,38 @@ export const useHomeLogic = () => {
       setTranslationResult(result);
       setTranslationJobs(result.jobs || []);
 
-      // Start polling for each job
+      // Start polling for each job (only for non-terminal states)
       if (result.jobs && result.jobs.length > 0) {
-        result.jobs.forEach((job) => {
-          console.log(
-            `Starting polling for job: ${job.job_id}, File: ${job.filename}, Language: ${job.target_language}`
-          );
-          pollJobStatus(job.job_id, job.filename);
+        result.jobs.forEach(async (job) => {
+          // Check current status before starting polling
+          try {
+            const currentStatus = await translationAPI.checkStatus(job.job_id);
+            
+            // Only start polling if job is not in a terminal state
+            if (
+              currentStatus.status !== "COMPLETED" &&
+              currentStatus.status !== "FAILED" &&
+              currentStatus.status !== "CANCELLED"
+            ) {
+              console.log(
+                `Starting polling for job: ${job.job_id}, File: ${job.filename}, Language: ${job.target_language}`
+              );
+              pollJobStatus(job.job_id, job.filename);
+            } else {
+              console.log(
+                `Skipping polling for job ${job.job_id} - already in terminal state: ${currentStatus.status}`
+              );
+              // Update status in state
+              setJobStatuses((prev) => ({
+                ...prev,
+                [job.job_id]: currentStatus,
+              }));
+            }
+          } catch (error) {
+            console.error(`Error checking initial status for job ${job.job_id}:`, error);
+            // Start polling anyway as fallback
+            pollJobStatus(job.job_id, job.filename);
+          }
         });
       } else {
         console.warn("No jobs returned from translation API");
@@ -2214,7 +2310,9 @@ export const useHomeLogic = () => {
     isTranslating,
     translationResult,
     translationJobs,
+    setTranslationJobs,
     jobStatuses,
+    setJobStatuses,
     evaluationData,
     previewText,
     showPreview,
