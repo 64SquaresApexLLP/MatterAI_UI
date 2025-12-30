@@ -684,7 +684,7 @@ const Home = ({ user, onBack, onLogout }) => {
               </p>
               <p className="text-sm mt-2 opacity-70">
                 {selectedButton === "Translation"
-                  ? "Supported formats: PDF, DOCX, PPTX"
+                  ? "Supported formats: DOCX"
                   : selectedButton === "File_Converter"
                   ? "Supported formats: PDF, DOC, DOCX"
                   : "Release to upload your files"}
@@ -692,7 +692,6 @@ const Home = ({ user, onBack, onLogout }) => {
             </div>
           </div>
         </div>
-        s
       </div>
       <ToastContainer
         position="top-right"
@@ -939,7 +938,7 @@ const Home = ({ user, onBack, onLogout }) => {
                   multiple={!isMultiLanguageMode}
                   accept={
                     selectedButton === "Translation"
-                      ? ".pdf,.docx,.pptx"
+                      ? ".docx"
                       : selectedButton === "File_Converter"
                       ? ".pdf,.doc,.docx"
                       : ".pdf,.doc,.docx,.txt,.xls,.xlsx"
@@ -952,7 +951,7 @@ const Home = ({ user, onBack, onLogout }) => {
                   className="flex-shrink-0 m-0 p-2 text-[#062e69]/70 hover:text-[#062e69] transition-colors duration-200 hover:bg-[#062e69]/10 rounded-lg"
                   title={
                     selectedButton === "Translation"
-                      ? "Upload files (PDF, DOCX, PPTX only)"
+                      ? "Upload files (DOCX only)"
                       : selectedButton === "File_Converter"
                       ? "Upload files (PDF, DOC, DOCX only)"
                       : "Upload files"
@@ -1516,11 +1515,11 @@ const Home = ({ user, onBack, onLogout }) => {
         <div
           className={`fixed top-0 h-full ${
             showDeltaModal
-              ? "right-[35vw] w-[35vw] bg-white/5 backdrop-blur-sm border-l border-white/10"
+              ? "right-[35vw] w-[35vw] bg-white/5 backdrop-blur-sm border-l border-white/10 overflow-x-auto"
               : "right-0 w-[50vw]"
-          } p-2 overflow-y-auto z-40`}
+          } p-2 overflow-y-auto overflow-x-auto z-40`}
         >
-          <div className="h-full bg-white/95 backdrop-blur-xl border border-[#062e69]/30 rounded-2xl shadow-lg flex flex-col overflow-y-auto max-h-screen">
+          <div className="h-full bg-white/95 backdrop-blur-xl border border-[#062e69]/30 rounded-2xl shadow-lg flex flex-col overflow-x-auto overflow-y-auto max-h-screen">
             {/* Header Section */}
             <div className="flex items-center justify-between p-2">
               <div className="flex items-center space-x-2">

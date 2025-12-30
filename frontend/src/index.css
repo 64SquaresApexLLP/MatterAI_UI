@@ -110,13 +110,17 @@ button {
 .docx-wrapper {
   background: white;
   padding: 10px;
+  /* scale: 90%; */
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  /* overflow-x: auto; */
+  max-width: 50vw;
 }
 
 .docx-wrapper section.docx {
   margin-bottom: 10px;
   background: white;
   padding: 10px;
+
 }
 
 .docx-wrapper p {

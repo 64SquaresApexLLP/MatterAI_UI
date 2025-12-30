@@ -1606,7 +1606,7 @@ export const useHomeLogic = () => {
       });
 
       if (validFiles.length === 0) {
-        toast.error("Please upload PDF or Word documents only");
+        toast.error("Please upload Word documents only");
         return;
       }
 
@@ -1630,14 +1630,14 @@ export const useHomeLogic = () => {
 
       fileArray.forEach((file) => {
         const validTypes = [
-          "application/pdf",
+          // "application/pdf",
           "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-          "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+          // "application/vnd.openxmlformats-officedocument.presentationml.presentation",
         ];
 
         const isValidType =
           validTypes.includes(file.type) ||
-          file.name.match(/\.(pdf|docx|pptx)$/i);
+          file.name.match(/\.(docx)$/i);
 
         if (isValidType) {
           const fileObj = {
